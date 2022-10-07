@@ -141,16 +141,16 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println(someURL())
 }
 
-// func routeSubmitPostExcel(w http.ResponseWriter, r *http.Request) {
-// 	if r.Method != "POST" {
-// 		http.Error(w, "", http.StatusBadRequest)
-// 		return
-// 	}
+	// func routeSubmitPostExcel(w http.ResponseWriter, r *http.Request) {
+	// 	if r.Method != "POST" {
+	// 		http.Error(w, "", http.StatusBadRequest)
+	// 		return
+	// 	}
 
-// 	if err := r.ParseMultipartForm(1024); err != nil {
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
+	// 	if err := r.ParseMultipartForm(1024); err != nil {
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 		return
+	// 	}
 
 
 	alias := r.FormValue("alias")
@@ -158,11 +158,11 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 	uploadedFile, handler, err := r.FormFile("file")
 
 
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-// 	defer uploadedFile.Close()
+	// 	if err != nil {
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 		return
+	// 	}
+	// 	defer uploadedFile.Close()
 
 
 	dir, err := os.Getwd()

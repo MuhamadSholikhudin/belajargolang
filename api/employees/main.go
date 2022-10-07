@@ -19,8 +19,11 @@ type Employee struct {
 }
 
 type Dateemployee struct {
-	Hire_date string `json:"hire_date"`
-	Date_out  string `json:"date_out"`
+	Name            string `json:"name"`
+	Date_of_birth   string `json:"date_of_birth"`
+	Hire_date       string `json:"hire_date"`
+	Date_out        string `json:"date_out"`
+	Status_employee string `json:"status_employee"`
 }
 
 type Count struct {
@@ -41,52 +44,63 @@ func Conn() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return db, nil
-
 }
 
 var datas []Employee
+
+// func Index(w http.ResponseWriter, r *http.Request) {
+
+// 	w.Header().Set("Content-Type", "application/json")
+
+// 	db, err := Conn()
+// 	if err != nil {
+// 		fmt.Println(err.Error())
+// 		return
+// 	}
+// 	defer db.Close()
+
+// 	rows, err := db.Query("select number_of_employees, COALESCE(national_id, 'NULL') as national_id from employees where id > ?", 0)
+// 	if err != nil {
+// 		fmt.Println(err.Error())
+// 		return
+// 	}
+// 	defer rows.Close()
+
+// 	var result []Employee
+
+// 	for rows.Next() {
+// 		var each = Employee{}
+// 		var err = rows.Scan(&each.Number_of_employees, &each.National_id)
+
+// 		if err != nil {
+// 			fmt.Println(err.Error())
+// 			return
+// 		}
+
+// 		result = append(result, each)
+// 	}
+
+// 	resp, err := json.Marshal(result)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 	}
+// 	w.Write([]byte(resp))
+// }
 
 func Index(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	db, err := Conn()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	defer db.Close()
-
-	rows, err := db.Query("select number_of_employees, national_id from employees where id > ?", 0)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	defer rows.Close()
-
-	var result []Employee
-
-	for rows.Next() {
-		var each = Employee{}
-		var err = rows.Scan(&each.Number_of_employees, &each.National_id)
-
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-
-		result = append(result, each)
+	result := map[string]string{
+		"data": "Connection Succesfully",
 	}
 
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
-
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {
@@ -192,8 +206,9 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 	national_id := ktp
 
 	err = db.
-		QueryRow("select hire_date, COALESCE(date_out, '0000-00-00') as date_out from employees where number_of_employees = ? AND national_id = ?", number_of_employees, national_id).
-		Scan(&result.Hire_date, &result.Date_out)
+		QueryRow("select name, date_of_birth, hire_date, COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = ? AND national_id = ?", number_of_employees, national_id).
+		Scan(&result.Name, &result.Date_of_birth, &result.Hire_date, &result.Date_out, &result.Status_employee)
+
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -419,6 +434,7 @@ func main() {
 
 	r := mux.NewRouter()
 
+	r.HandleFunc("/", Index).Methods("GET")
 	r.HandleFunc("/employees/{number_of_employees}", Get).Methods("GET")
 	r.HandleFunc("/resign/{number_of_employees}/{national_id}", GetKaryawan).Methods("GET")
 	r.HandleFunc("/resigndate/{number_of_employees}/{national_id}", GetResign).Methods("GET")
@@ -430,7 +446,7 @@ func main() {
 	r.HandleFunc("/resign", Post).Methods("POST")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
 
-	fmt.Println("LIsten on Port 127.0.0.1:8880")
-	http.ListenAndServe(":8880", r)
+	fmt.Println("LIsten on Port 10.10.42.6:8880")
+	http.ListenAndServe("10.10.42.6:8880", r)
 
 }
