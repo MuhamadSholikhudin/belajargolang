@@ -386,7 +386,6 @@ func GetDepartments(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
-
 		result = append(result, each)
 	}
 
