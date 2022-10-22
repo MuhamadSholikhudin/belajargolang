@@ -55,8 +55,14 @@ type ResignSubmission struct {
 	Status_resignsubmisssion     string `json:"status_resignsubmisssion"`
 	Age                          int    `json:"age"`
 	Using_media                  string `json:"using_media"`
+	Clasification                string `json:"clasification"`
 	Created_at                   string `json:"created_at"`
 	Updated_at                   string `json:"updated_at"`
+}
+
+type ResignAcc struct {
+	Number_of_employees string `json:"number_of_employees"`
+	Status_resign       string `json:"status_resign"`
 }
 
 func Conn() (*sql.DB, error) {
@@ -205,7 +211,7 @@ func GetKaryawan(w http.ResponseWriter, r *http.Request) {
 	if result.sum > 0 {
 		statushttp = "200"
 	} else {
-		statushttp = "400"
+		statushttp = "405"
 	}
 
 	response := map[string]interface{}{
@@ -275,7 +281,7 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if Count_resigns > 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
+	if Count_resigns > 0 || (Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel") {
 		result := map[string]interface{}{
 			"status":      405, //tidak diijinkan mengajukan
 			"information": "sudah resign dan sudah mengajukan resign sehingga tidak dapat mengajukan resign lagi untuk mengambil parklaring anda dapat langsung ke hrd",
@@ -408,7 +414,7 @@ func GetResignSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT number_of_employees, name, position, department, building, hire_date, date_out, date_resignation_submissions, type, reason, detail_reason, periode_of_service, age, suggestion, status_resignsubmisssion, using_media, created_at, updated_at FROM resignation_submissions order by created_at desc")
+	rows, err := db.Query("SELECT number_of_employees, name, position, department, building, hire_date, COALESCE(date_out, '') as date_out, date_resignation_submissions, type, reason, detail_reason, periode_of_service, age, suggestion, status_resignsubmisssion, using_media, created_at, updated_at FROM resignation_submissions order by created_at desc")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -532,6 +538,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(result)
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -619,6 +626,84 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(resp))
+}
+
+func PostAcc(w http.ResponseWriter, r *http.Request) {
+	//untuk membuat json pertama kita harus set Header
+	w.Header().Set("Content-Type", "application/json")
+
+	// data := r.Body
+	//mendecode requset body langsung menjadi json
+	data := ResignAcc{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	fmt.Println(data)
+
+	db, err := Conn()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	var dbhwi, _ = ConnHwi()
+	defer dbhwi.Close()
+
+	//acc submission
+	// Update data resign status acc
+	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ", data.Status_resign, data.Number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println("Acc Resign !")
+
+	var status_employee string
+	if data.Status_resign == "acc" {
+		status_employee = "notactive"
+	} else {
+		status_employee = "active"
+	}
+
+	//edit employees
+	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, data.Number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println("Acc Resign !")
+
+	//select resign submissions
+
+	var Submission = ResignSubmission{}
+
+	err = dbhwi.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	date_out,	date_resignation_submissions,	type,	reason,	detail_reason,	periode_of_service,	age,	suggestion,	status_reignsubmisssion,	using_media,	clasification
+	FROM resignation_submissions WHERE number_of_employees = ?", data.Number_of_employees).
+		Scan(Submission.Number_of_employees,	Submission.Name,	Submission.Position,	Submission.Department,	Submission.Building,	Submission.Hire_date,	Submission.Date_out,	Submission.Date_resignation_submissions,	Submission.Type,	Submission.Reason,	Submission.Detail_reason,	Submission.Suggestion,	Submission.Periode_of_service,	Submission.Age,	Submission.Status_resignsubmisssion,	Submission.Using_media,	Submission.Clasification)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	//insert data resigns
+	_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (number_of_employees,name,hire_date,classification,date_out,date_resignsubmissions,periode_of_service,type,age,status_resign,printed,created_at,updated_at)",
+		data.Number_of_employees, data.Number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println("Acc Resign !")
+
+	//insert data certificat atau description work
+
+	// resp, err := json.Marshal(result)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// }
+
+	// w.Write([]byte(resp))
+
 }
 
 /*
@@ -712,6 +797,7 @@ func main() {
 	r.HandleFunc("/resignsubmissions", GetResignSubmission).Methods("GET")
 
 	r.HandleFunc("/resign", Post).Methods("POST")
+	r.HandleFunc("/resignacc", PostAcc).Methods("POST")
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
 
