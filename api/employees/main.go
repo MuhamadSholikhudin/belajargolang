@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -67,21 +70,27 @@ type ResignAcc struct {
 }
 
 type Resign struct {
-	Id string `json:"number_of_employees"`
-Number_of_employees string `json:"number_of_employees"`
-Name string `json:"number_of_employees"`
-Hire_date date 
-Classification string `json:"number_of_employees"` 
-Date_out date 
-Date_resignsubmissions string `json:"number_of_employees"` 
-Periode_of_service string `json:"number_of_employees"` 
-Type string `json:"number_of_employees"`
-Age string `json:"number_of_employees"` 
-Status_resign string `json:"number_of_employees"`
-Printed string `json:"number_of_employees"` 
-Created_at string `json:"number_of_employees"` 
-Updated_at string `json:"number_of_employees"`
+	Id                     string `json:"id"`
+	Number_of_employees    string `json:"number_of_employees"`
+	Name                   string `json:"name"`
+	Position               string `json:"position"`
+	Department             string `json:"department"`
+	Hire_date              string `json:"hire_date"`
+	Classification         string `json:"classification"`
+	Date_out               string `json:"date_out"`
+	Date_resignsubmissions string `json:"date_resignsubmissions"`
+	Periode_of_service     string `json:"periode_of_service"`
+	Type                   string `json:"type"`
+	Age                    int    `json:"age"`
+	Status_resign          string `json:"status_resign"`
+	Printed                string `json:"printed"`
+	Created_at             string `json:"created_at"`
+	Updated_at             string `json:"updated_at"`
 }
+
+const (
+	LINKFRONTEND string = "http://127.0.0.1:8000"
+)
 
 func Conn() (*sql.DB, error) {
 
@@ -517,8 +526,15 @@ func GetResignSubmission(w http.ResponseWriter, r *http.Request) {
 
 	if count_submission == 0 {
 
-		var result = []map[string]string{
+		var datanull = []map[string]string{
 			{"number_of_employees": "NULL", "name": "NULL", "created_at": "NULL", "date_resignation_submissions": "NULL", "position": "NULL", "department": "NULL", "status_resignsubmisssion": "NULL"},
+		}
+
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
 		}
 
 		resp, err := json.Marshal(result)
@@ -530,14 +546,93 @@ func GetResignSubmission(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.Query("SELECT number_of_employees, name, position, department, building, hire_date, COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'), COALESCE(type, ''), COALESCE(reason, ''), COALESCE(detail_reason, ''), COALESCE(periode_of_service, 0), COALESCE(age, 0), COALESCE(suggestion, ''), COALESCE(status_resignsubmisssion, ''), COALESCE(using_media, ''), created_at, updated_at FROM resignation_submissions order by created_at desc")
+	u, err := url.Parse(r.RequestURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	q := u.Query()
+
+	var sqlPaging string = "SELECT number_of_employees, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(building, ''), COALESCE(hire_date, ''), COALESCE(date_out, '') as date_out, COALESCE(date_resignation_submissions, ''), COALESCE(type, ''), COALESCE(reason, ''), COALESCE(detail_reason, ''), COALESCE(periode_of_service, 0), COALESCE(age, 0), COALESCE(suggestion, ''), COALESCE(status_resignsubmisssion, ''), COALESCE(using_media, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resignation_submissions"
+	var sqlCount string = "SELECT COUNT(*) FROM resignation_submissions"
+
+	var params string = ""
+
+	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
+	if checkNumber_of_employees != false {
+		justStringnumber_of_employees := strings.Join(number_of_employees, "")
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' order by created_at desc", sqlPaging, justStringnumber_of_employees)
+		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
+		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
+	}
+
+	var total int64
+
+	db.QueryRow(sqlCount).Scan(&total)
+
+	if total == 0 {
+		var datanull = []map[string]string{
+			{"number_of_employees": "NULL", "name": "NULL", "created_at": "NULL", "date_resignation_submissions": "NULL", "position": "NULL", "department": "NULL", "status_resignsubmisssion": "NULL"},
+		}
+
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
+		}
+
+		resp, err := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		w.Write([]byte(resp))
+		return
+	}
+
+	var totalminbyperpage int64 = total - ((total / 10) * 10)
+
+	var lastPage int64
+	if totalminbyperpage == 0 {
+		lastPage = (total / 10)
+	} else {
+		lastPage = ((total / 10) + 1)
+	}
+
+	page, _ := strconv.Atoi("1")
+	cpage, checkPage := q["page"]
+	if checkPage != false {
+		spage, _ := strconv.Atoi(strings.Join(cpage, ""))
+		page = spage
+	}
+
+	var first, last, next, prev string
+	first, last, next, prev = "", "", "", ""
+
+	first = "1"
+	last = strconv.Itoa(int(lastPage))
+
+	next = strconv.Itoa(int(page + 1))
+	if int(page+1) >= int(lastPage) {
+		next = strconv.Itoa(int(lastPage))
+	}
+
+	prev = strconv.Itoa(int(page - 1))
+	if int(page) == 1 {
+		prev = strconv.Itoa(int(page))
+	}
+
+	perPage, _ := strconv.Atoi("10")
+	sqlPaging = fmt.Sprintf("%s LIMIT %d OFFSET %d", sqlPaging, perPage, (page-1)*perPage)
+
+	rows, err := db.Query(sqlPaging)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer rows.Close()
 
-	var result []ResignSubmission
+	var submission []ResignSubmission
 
 	for rows.Next() {
 		var each = ResignSubmission{}
@@ -547,16 +642,43 @@ func GetResignSubmission(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
+		submission = append(submission, each)
+	}
 
-		result = append(result, each)
+	links := map[string]interface{}{
+		"first": fmt.Sprintf("%s/resigns/submission?page=%s%s", LINKFRONTEND, first, params),
+		"last":  fmt.Sprintf("%s/resigns/submission?page=%s%s", LINKFRONTEND, last, params),
+		"next":  fmt.Sprintf("%s/resigns/submission?page=%s%s", LINKFRONTEND, next, params),
+		"prev":  fmt.Sprintf("%s/resigns/submission?page=%s%s", LINKFRONTEND, prev, params),
+	}
+
+	informationpages := map[string]interface{}{
+		"currentPage": page,
+		"from":        ((page - 1) * 10) + 1,
+		"lastPage":    lastPage,
+		"perPage":     10,
+		"to":          ((page - 1) * 10) + len(submission),
+		"total":       total,
+	}
+
+	pages := map[string]interface{}{
+		"page": informationpages,
+	}
+
+	result := map[string]interface{}{
+		"code":  200,
+		"meta":  pages,
+		"data":  submission,
+		"links": links,
 	}
 
 	resp, err := json.Marshal(result)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
 	w.Write([]byte(resp))
+
 }
 
 func GetResignSubmissionSearch(w http.ResponseWriter, r *http.Request) {
@@ -873,8 +995,58 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow("SELECT COUNT(id) as count_resign FROM resigns ").
 		Scan(&count_resign)
 	if count_resign == 0 {
-		var result = []map[string]string{
-			{"number_of_employees": "NULL", "name": "NULL", "created_at": "NULL", "date_resignation_submissions": "NULL", "position": "NULL", "department": "NULL", "status_resignsubmisssion": "NULL"},
+		var datanull = []map[string]string{
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "date_resignsubmissions": "NULL", "position": "NULL", "department": "NULL", "type": "NULL", "age": "0", "status_resign": "NULL", "printed": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+		}
+
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
+		}
+
+		resp, err := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		w.Write([]byte(resp))
+		return
+	}
+	u, err := url.Parse(r.RequestURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	q := u.Query()
+
+	var sqlPaging string = "SELECT id, number_of_employees, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(classification, ''), COALESCE(date_out, ''), COALESCE(date_resignsubmissions, ''), COALESCE(periode_of_service, ''), COALESCE(position, ''), COALESCE(department, ''), COALESCE(type, ''), COALESCE(age, ''), COALESCE(status_resign, ''), COALESCE(printed, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resigns"
+	var sqlCount string = "SELECT COUNT(*) FROM resigns"
+
+	var params string = ""
+
+	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
+	if checkNumber_of_employees != false {
+		justStringnumber_of_employees := strings.Join(number_of_employees, "")
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlPaging, justStringnumber_of_employees)
+		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
+		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
+	}
+
+	var total int64
+
+	db.QueryRow(sqlCount).Scan(&total)
+
+	if total == 0 {
+		var datanull = []map[string]string{
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "date_resignsubmissions": "NULL", "position": "NULL", "department": "NULL", "type": "NULL", "age": "0", "status_resign": "NULL", "printed": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+		}
+
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
 		}
 
 		resp, err := json.Marshal(result)
@@ -886,33 +1058,95 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.Query("SELECT * FROM resign")
+	var totalminbyperpage int64
+	totalminbyperpage = total - ((total / 10) * 10)
+
+	var lastPage int64
+	if totalminbyperpage == 0 {
+		lastPage = (total / 10)
+	} else {
+		lastPage = ((total / 10) + 1)
+	}
+
+	page, _ := strconv.Atoi("1")
+	cpage, checkPage := q["page"]
+	if checkPage != false {
+		spage, _ := strconv.Atoi(strings.Join(cpage, ""))
+		page = spage
+	}
+
+	var first, last, next, prev string
+	first, last, next, prev = "", "", "", ""
+
+	first = "1"
+	last = strconv.Itoa(int(lastPage))
+
+	next = strconv.Itoa(int(page + 1))
+	if int(page+1) >= int(lastPage) {
+		next = strconv.Itoa(int(lastPage))
+	}
+
+	prev = strconv.Itoa(int(page - 1))
+	if int(page) == 1 {
+		prev = strconv.Itoa(int(page))
+	}
+
+	perPage, _ := strconv.Atoi("10")
+	sqlPaging = fmt.Sprintf("%s LIMIT %d OFFSET %d", sqlPaging, perPage, (page-1)*perPage)
+
+	rows, err := db.Query(sqlPaging)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer rows.Close()
 
-	var result []Resign
+	var resign []Resign
 
-	for rows.Next(){
-		var each Resign{}
-		var err = rows.Scan(&each)
+	for rows.Next() {
+		var each = Resign{}
+		var err = rows.Scan(&each.Id, &each.Number_of_employees, &each.Name, &each.Hire_date, &each.Classification, &each.Date_out, &each.Date_resignsubmissions, &each.Periode_of_service, &each.Position, &each.Department, &each.Type, &each.Age, &each.Status_resign, &each.Printed, &each.Created_at, &each.Updated_at)
+
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
+		resign = append(resign, each)
+	}
 
-		result = append(result, each)
+	links := map[string]interface{}{
+		"first": fmt.Sprintf("%s/resigns/resign?page=%s%s", LINKFRONTEND, first, params),
+		"last":  fmt.Sprintf("%s/resigns/resign?page=%s%s", LINKFRONTEND, last, params),
+		"next":  fmt.Sprintf("%s/resigns/resign?page=%s%s", LINKFRONTEND, next, params),
+		"prev":  fmt.Sprintf("%s/resigns/resign?page=%s%s", LINKFRONTEND, prev, params),
+	}
+
+	informationpages := map[string]interface{}{
+		"currentPage": page,
+		"from":        ((page - 1) * 10) + 1,
+		"lastPage":    lastPage,
+		"perPage":     10,
+		"to":          ((page - 1) * 10) + len(resign),
+		"total":       total,
+	}
+
+	pages := map[string]interface{}{
+		"page": informationpages,
+	}
+
+	result := map[string]interface{}{
+		"code":  200,
+		"meta":  pages,
+		"data":  resign,
+		"links": links,
 	}
 
 	resp, err := json.Marshal(result)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
 	w.Write([]byte(resp))
-
 
 }
 
@@ -1004,9 +1238,9 @@ func main() {
 	r.HandleFunc("/resignbuildings", GetGedungs).Methods("GET")
 	r.HandleFunc("/resignalamat/{number_of_employees}", GetAlamat).Methods("GET")
 
+	r.HandleFunc("/resignsubmissions", GetResignSubmission).Methods("GET")
 	r.HandleFunc("/resignsubmissions/{search}", GetResignSubmissionSearch).Methods("GET")
 	r.HandleFunc("/resignsubmissions/{number_of_employees}/{status_resign}", GetResignSubmissionStatus).Methods("GET")
-	r.HandleFunc("/resignsubmissions", GetResignSubmission).Methods("GET")
 
 	r.HandleFunc("/resign", Post).Methods("POST")
 	r.HandleFunc("/resignacc", PostAcc).Methods("POST")
