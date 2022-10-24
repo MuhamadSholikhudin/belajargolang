@@ -1150,6 +1150,55 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func PostCertifcate(w http.ResponseWriter, r *http.Request) {
+
+	// currentTime := time.Now()
+
+	// timestampnow := currentTime.Format("2006-01-02")
+	// datenow := currentTime.Format("2006-01-02")
+
+	//untuk membuat json pertama kita harus set Header
+	w.Header().Set("Content-Type", "application/json")
+
+	Data_post := `json:"number_of_employees"`
+
+	err := json.NewDecoder(r.Body).Decode(&Data_post)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	db, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	var CountCertifcateNumberOf_employees int
+
+	err = db.QueryRow("SELECT COUNT(*) FROM certificate_of_employents WHERE number_of_employees = ?", Data_post).
+		Scan(&CountCertifcateNumberOf_employees)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
+	if CountCertifcateNumberOf_employees == 0 {
+
+		var CountCertificateByDate, CountNoCertificateEmployee int
+
+		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_certificate_employee, 0) FROM certificate_of_employents YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", time.Now().Year(), time.Now().Month()).
+			Scan(&CountCertificateByDate, CountNoCertificateEmployee)
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+
+		//create certificate
+		// _, err := db.Exec("INSERT INTO certificate_of_employents (resin_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at)")
+
+	}
+
+}
+
 /*
 	func Update(w http.ResponseWriter, r *http.Request) {
 		//untuk membuat json pertama kita harus set Header
