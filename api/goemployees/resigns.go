@@ -139,8 +139,9 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := map[string]interface{}{
-		"meta":  pages,
+		"code":  200,
 		"data":  employee,
+		"meta":  pages,
 		"links": links,
 	}
 

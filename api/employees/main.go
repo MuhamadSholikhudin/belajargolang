@@ -88,9 +88,98 @@ type Resign struct {
 	Updated_at             string `json:"updated_at"`
 }
 
+type Letter struct {
+	Id                  int    `json:"id"`
+	Resign_id           int    `json:"resign_id"`
+	Number_of_employees string `json:"number_of_employees"`
+	Date                string `json:"date"`
+	No                  string `json:"no"`
+	Rom                 string `json:"rom"`
+	Status              string `json:"status"`
+	Action              string `json:"action"`
+	Created_at          string `json:"created_at"`
+	Updated_at          string `json:"updated_at"`
+}
+
 const (
 	LINKFRONTEND string = "http://127.0.0.1:8000"
+
+	DDMMYYYYhhmmss = "2006-01-02 15:04:05"
+	DDMMYYYY       = "2006-01-02"
 )
+
+func DMYhms() string {
+	t := time.Now()
+	location, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		fmt.Println(err)
+	}
+	datetimenow := t.In(location).Format(DDMMYYYYhhmmss)
+	return datetimenow
+}
+
+func DMY() string {
+	t := time.Now()
+	location, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		fmt.Println(err)
+	}
+	datetimenow := t.In(location).Format(DDMMYYYY)
+	return datetimenow
+}
+
+func StringMonth() string {
+	var now = time.Now()
+	var stringmonth string
+	stringmonth = strconv.Itoa(int(now.Month()))
+	var length = len([]rune(stringmonth))
+	var value string = stringmonth
+	if length == 1 {
+		value = fmt.Sprintf("0%s", stringmonth)
+	}
+	return value
+}
+
+func Rom(stringmonth string) string {
+	var Rom string
+	if stringmonth == "01" {
+		Rom = "I"
+	}
+	if stringmonth == "02" {
+		Rom = "II"
+	}
+	if stringmonth == "03" {
+		Rom = "III"
+	}
+	if stringmonth == "04" {
+		Rom = "IV"
+	}
+	if stringmonth == "05" {
+		Rom = "V"
+	}
+	if stringmonth == "06" {
+		Rom = "VI"
+	}
+	if stringmonth == "07" {
+		Rom = "VII"
+	}
+	if stringmonth == "08" {
+		Rom = "VIII"
+	}
+	if stringmonth == "09" {
+		Rom = "IX"
+	}
+	if stringmonth == "10" {
+		Rom = "X"
+	}
+	if stringmonth == "11" {
+		Rom = "XI"
+	}
+	if stringmonth == "12" {
+		Rom = "XII"
+	}
+	return Rom
+}
 
 func Conn() (*sql.DB, error) {
 
@@ -158,6 +247,8 @@ var datas []Employee
 func Index(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
+
+	fmt.Println(StringMonth())
 
 	result := map[string]string{
 		"data": "Connection Succesfully",
@@ -1022,7 +1113,6 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 
 	var sqlPaging string = "SELECT id, number_of_employees, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(classification, ''), COALESCE(date_out, ''), COALESCE(date_resignsubmissions, ''), COALESCE(periode_of_service, ''), COALESCE(position, ''), COALESCE(department, ''), COALESCE(type, ''), COALESCE(age, ''), COALESCE(status_resign, ''), COALESCE(printed, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resigns"
 	var sqlCount string = "SELECT COUNT(*) FROM resigns"
-
 	var params string = ""
 
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
@@ -1034,9 +1124,7 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int64
-
 	db.QueryRow(sqlCount).Scan(&total)
-
 	if total == 0 {
 		var datanull = []map[string]string{
 			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "date_resignsubmissions": "NULL", "position": "NULL", "department": "NULL", "type": "NULL", "age": "0", "status_resign": "NULL", "printed": "NULL", "created_at": "NULL", "updated_at": "NULL"},
@@ -1152,17 +1240,11 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 
 func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 
-	// currentTime := time.Now()
-
-	// timestampnow := currentTime.Format("2006-01-02")
-	// datenow := currentTime.Format("2006-01-02")
-
 	//untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
 
-	Data_post := `json:"number_of_employees"`
-
-	err := json.NewDecoder(r.Body).Decode(&Data_post)
+	data := Letter{}
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -1174,28 +1256,74 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
+	var Resign_id int
+	var ResignSel = Resign{}
+	err = db.QueryRow("SELECT id as resign_id, name, position, department, hire_date, date_out FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
+		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
 	var CountCertifcateNumberOf_employees int
 
-	err = db.QueryRow("SELECT COUNT(*) FROM certificate_of_employents WHERE number_of_employees = ?", Data_post).
+	err = db.QueryRow("SELECT COUNT(*) FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees).
 		Scan(&CountCertifcateNumberOf_employees)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
 
 	if CountCertifcateNumberOf_employees == 0 {
-
 		var CountCertificateByDate, CountNoCertificateEmployee int
-
-		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_certificate_employee, 0) FROM certificate_of_employents YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", time.Now().Year(), time.Now().Month()).
-			Scan(&CountCertificateByDate, CountNoCertificateEmployee)
+		var yearstring string
+		yearstring = strconv.Itoa(time.Now().Year())
+		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_certificate_employee, 0) as no_certificate_employee FROM certificate_of_employments WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", yearstring, StringMonth()).
+			Scan(&CountCertificateByDate, &CountNoCertificateEmployee)
 		if err != nil {
 			fmt.Print(err.Error())
 		}
-
-		//create certificate
-		// _, err := db.Exec("INSERT INTO certificate_of_employents (resin_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at)")
-
+		// create certificate
+		_, err := db.Exec("INSERT INTO certificate_of_employments (resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", Resign_id, data.Number_of_employees, DMY(), (CountNoCertificateEmployee + 1), Rom(StringMonth()), DMYhms(), DMYhms())
+		if err != nil {
+			fmt.Print(err.Error())
+		}
 	}
+
+	var certifictaeofemploment = Letter{}
+
+	err = db.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
+		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	certificate := map[string]interface{}{
+		"id":                  certifictaeofemploment.Id,
+		"resign_id":           certifictaeofemploment.Resign_id,
+		"number_of_employees": certifictaeofemploment.Number_of_employees,
+		"name":                ResignSel.Name,
+		"position":            ResignSel.Position,
+		"date_out":            ResignSel.Date_out,
+		"date":                certifictaeofemploment.Date,
+		"no":                  certifictaeofemploment.No,
+		"rom":                 certifictaeofemploment.Rom,
+		"created_at":          certifictaeofemploment.Created_at,
+		"updated_at":          certifictaeofemploment.Updated_at,
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    certificate,
+		"message": "Succesfully",
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	fmt.Println(resp)
+	w.Write([]byte(resp))
 
 }
 
@@ -1296,6 +1424,7 @@ func main() {
 
 	//Resigns
 	r.HandleFunc("/resigns", GetResigns).Methods("GET")
+	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
 
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
