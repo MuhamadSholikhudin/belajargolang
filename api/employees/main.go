@@ -420,8 +420,8 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 
 	var Count_resigns int
 
-	err = db.
-		QueryRow("select name, date_of_birth, hire_date, COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = ? AND national_id = ?", number_of_employees, national_id).
+	// Menampilkan data karyawan
+	err = db.QueryRow("select name, date_of_birth, hire_date, COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = ? AND national_id = ?", number_of_employees, national_id).
 		Scan(&resultemployee.Name, &resultemployee.Date_of_birth, &resultemployee.Hire_date, &resultemployee.Date_out, &resultemployee.Status_employee)
 
 	if err != nil {
@@ -450,6 +450,7 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//Jika sudah resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
 	if Count_resigns > 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 		result := map[string]interface{}{
 			"status":      405, //tidak diijinkan mengajukan
@@ -464,6 +465,7 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//Jika belum resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
 	if Count_resigns == 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 		result := map[string]interface{}{
 			"status":      404, //tidak diijinkan mengajukan
@@ -478,7 +480,7 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Sudah resign tapi belum mengajukan resign
+	//Sudah resign tapi belum mengajukan resign maka boleh mengajukan
 	if Count_resigns == 1 && Count_resign_submissions == 0 {
 		result := map[string]interface{}{
 			"status":      202, //boleh mengajukan resign walau sudah resign
@@ -493,7 +495,7 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TIdak resign dan belum mengajukan resign
+	// TIdak resign dan belum mengajukan resign maka boleh mengajukan resign
 	if Count_resigns == 0 && Count_resign_submissions == 0 {
 		result := map[string]interface{}{
 			"status":      200, //boleh mengajukan resign karena belum resign
@@ -959,11 +961,6 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 
 func PostAcc(w http.ResponseWriter, r *http.Request) {
 
-	currentTime := time.Now()
-
-	timestampnow := currentTime.Format("2006-01-02")
-	datenow := currentTime.Format("2006-01-02")
-
 	//untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1021,7 +1018,7 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//insert data resigns
-	_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", &Submission.Number_of_employees, &Submission.Name, &Submission.Hire_date, &Submission.Classification, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Periode_of_service, &Submission.Type, &Submission.Age, &Submission.Status_resignsubmisssion, 0, timestampnow, timestampnow)
+	_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", &Submission.Number_of_employees, &Submission.Name, &Submission.Hire_date, &Submission.Classification, &Submission.Date_resignation_submissions, &Submission.Date_resignation_submissions, &Submission.Periode_of_service, &Submission.Type, &Submission.Age, &Submission.Status_resignsubmisssion, 0, DMYhms(), DMYhms())
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -1030,7 +1027,7 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 
 	var resign_id int
 
-	err = dbhwi.QueryRow("SELECT id FROM resigns WHERE created_at = ?", timestampnow).
+	err = dbhwi.QueryRow("SELECT id FROM resigns WHERE created_at = ?", DMYhms()).
 		Scan(&resign_id)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -1040,7 +1037,7 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 	// insert data certificat atau description work
 	if Submission.Type == "true" && Submission.Periode_of_service > 365 && data.Status_resign == "acc" {
 
-		_, err = dbhwi.Exec("INSERT INTO `certificate_of_employments`(`resign_id`, `date_certificate_employee`, `no_certificate_employee`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, datenow, 1, timestampnow, timestampnow)
+		_, err = dbhwi.Exec("INSERT INTO `certificate_of_employments`(`resign_id`, `date_certificate_employee`, `no_certificate_employee`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, DMY(), 1, DMYhms(), DMYhms())
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -1049,7 +1046,7 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 
 	} else if Submission.Type == "false" && data.Status_resign == "acc" {
 
-		_, err = dbhwi.Exec("INSERT INTO `work_experience_letters`(`resign_id`, `date_letter_exprerience`, `no_letter_experience`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, datenow, 1, timestampnow, timestampnow)
+		_, err = dbhwi.Exec("INSERT INTO `work_experience_letters`(`resign_id`, `date_letter_exprerience`, `no_letter_experience`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, DMY(), 1, DMYhms(), DMYhms())
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -1303,6 +1300,8 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 		"number_of_employees": certifictaeofemploment.Number_of_employees,
 		"name":                ResignSel.Name,
 		"position":            ResignSel.Position,
+		"department":          ResignSel.Department,
+		"hire_date":           ResignSel.Hire_date,
 		"date_out":            ResignSel.Date_out,
 		"date":                certifictaeofemploment.Date,
 		"no":                  certifictaeofemploment.No,
@@ -1322,7 +1321,6 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	fmt.Println(resp)
 	w.Write([]byte(resp))
 
 }
@@ -1430,6 +1428,6 @@ func main() {
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
 
 	fmt.Println("LIsten on Port 10.10.42.6:8880")
-	http.ListenAndServe("10.10.42.6:8880", r)
+	http.ListenAndServe(":8880", r)
 
 }
