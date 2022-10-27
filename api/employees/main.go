@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/gorilla/mux"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -825,6 +825,16 @@ func GetResignSubmissionSearch(w http.ResponseWriter, r *http.Request) {
 
 func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 
+	db, err := Conn()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	var dbhwi, _ = ConnHwi()
+	defer dbhwi.Close()
+
 	if r.Method != "POST" {
 		http.Error(w, "", http.StatusBadRequest)
 		return
@@ -841,17 +851,18 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("ERROR", err.Error())
 	}
 
-	xlsx, err := excelize.OpenReader(uploadedFile)
+	reader := csv.NewReader(uploadedFile)
+	records, _ := reader.ReadAll()
 
-	// Benar
-	sheet1Name := "Sheet One"
+	for _, record := range records {
+		fmt.Println(record[0], record[1], record[2], record[3], record[4], record[5])
 
-	for index, _ := range xlsx.GetRows(sheet1Name) {
-		fmt.Println(index)
+		//Cek data resign == 1 dan pengajuan status !== cancel !== 0
 
-		tambah := index + 1
-		a := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("A%d", tambah))
-		fmt.Fprintln(a)
+		//Cek data resign jika sudah resign maka clasifikasi sudah resign baru
+
+		//Cek data pengajuan ada apa tidak jika tidak ada maka insert data
+
 	}
 
 	//Upload file data excel
