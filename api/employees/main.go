@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/gorilla/mux"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -645,7 +646,7 @@ func GetResignSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 	q := u.Query()
 
-	var sqlPaging string = "SELECT number_of_employees, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(building, ''), COALESCE(hire_date, ''), COALESCE(date_out, '') as date_out, COALESCE(date_resignation_submissions, ''), COALESCE(type, ''), COALESCE(reason, ''), COALESCE(detail_reason, ''), COALESCE(periode_of_service, 0), COALESCE(age, 0), COALESCE(suggestion, ''), COALESCE(status_resignsubmisssion, ''), COALESCE(using_media, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resignation_submissions"
+	var sqlPaging string = "SELECT number_of_employees, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(building, ''), COALESCE(hire_date, ''), COALESCE(date_out, '') as date_out, COALESCE(date_resignation_submissions, ''), COALESCE(type, ''), COALESCE(reason, ''), COALESCE(detail_reason, ''), COALESCE(periode_of_service, 0), COALESCE(age, 0), COALESCE(suggestion, ''), COALESCE(status_resignsubmisssion, ''), COALESCE(using_media, ''), COALESCE(classification, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resignation_submissions"
 	var sqlCount string = "SELECT COUNT(*) FROM resignation_submissions"
 
 	var params string = ""
@@ -729,7 +730,7 @@ func GetResignSubmission(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var each = ResignSubmission{}
-		var err = rows.Scan(&each.Number_of_employees, &each.Name, &each.Position, &each.Department, &each.Building, &each.Hire_date, &each.Date_out, &each.Date_resignation_submissions, &each.Type, &each.Reason, &each.Detail_reason, &each.Periode_of_service, &each.Age, &each.Suggestion, &each.Status_resignsubmisssion, &each.Using_media, &each.Created_at, &each.Updated_at)
+		var err = rows.Scan(&each.Number_of_employees, &each.Name, &each.Position, &each.Department, &each.Building, &each.Hire_date, &each.Date_out, &each.Date_resignation_submissions, &each.Type, &each.Reason, &each.Detail_reason, &each.Periode_of_service, &each.Age, &each.Suggestion, &each.Status_resignsubmisssion, &each.Using_media, &each.Classification, &each.Created_at, &each.Updated_at)
 
 		if err != nil {
 			fmt.Println(err.Error())
@@ -820,6 +821,47 @@ func GetResignSubmissionSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(resp))
+}
+
+func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "POST" {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseMultipartForm(1024); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	uploadedFile, _, err := r.FormFile("file")
+
+	if err != nil {
+		log.Fatal("ERROR", err.Error())
+	}
+
+	xlsx, err := excelize.OpenReader(uploadedFile)
+
+	// Benar
+	sheet1Name := "Sheet One"
+
+	for index, _ := range xlsx.GetRows(sheet1Name) {
+		fmt.Println(index)
+
+		tambah := index + 1
+		a := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("A%d", tambah))
+		fmt.Fprintln(a)
+	}
+
+	//Upload file data excel
+
+	//Cek data resign == 1 dan pengajuan status !== cancel !== 0
+
+	//Cek data resign jika sudah resign maka clasifikasi sudah resign baru
+
+	//Cek data pengajuan ada apa tidak jika tidak ada maka insert data
+
 }
 
 func GetGedungs(w http.ResponseWriter, r *http.Request) {
@@ -1143,10 +1185,9 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var totalminbyperpage int64
+	var totalminbyperpage, lastPage int64
 	totalminbyperpage = total - ((total / 10) * 10)
 
-	var lastPage int64
 	if totalminbyperpage == 0 {
 		lastPage = (total / 10)
 	} else {
@@ -1416,6 +1457,7 @@ func main() {
 	r.HandleFunc("/resignsubmissions", GetResignSubmission).Methods("GET")
 	r.HandleFunc("/resignsubmissions/{search}", GetResignSubmissionSearch).Methods("GET")
 	r.HandleFunc("/resignsubmissions/{number_of_employees}/{status_resign}", GetResignSubmissionStatus).Methods("GET")
+	r.HandleFunc("/resgnsubmission_upload", UploadExcelSubmission).Methods("POST")
 
 	r.HandleFunc("/resign", Post).Methods("POST")
 	r.HandleFunc("/resignacc", PostAcc).Methods("POST")
