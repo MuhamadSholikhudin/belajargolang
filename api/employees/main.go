@@ -1538,17 +1538,20 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(Count_id, Status_employees, Employee.Name, Employee.Hire_date, Employee.Date_of_birth, Employee.Date_out, Employee.Address_jalan, Employee.Address_rt, Employee.Address_rw, Employee.Address_village, Employee.Address_district, Employee.Address_city, Employee.Address_province)
 
 		if Count_id > 0 {
-			// if Status_employees == "notactive" {
-			queryupdate := fmt.Sprintf("UPDATE employees SET date_out = %s , status_employee = %s, exit_statement = %s WHERE number_of_employees = %s ", record[2], "notactive", record[3], record[0])
-
-			fmt.Println(queryupdate)
-			// _, err = db.Exec(queryupdate)
-			// if err != nil {
-			// 	fmt.Println(err.Error())
-			// }
-			// }
+			if Status_employees == "notactive" {
+				queryupdate := fmt.Sprintf("UPDATE employees SET date_out = %s , status_employee = %s, exit_statement = %s WHERE number_of_employees = %s ", record[2], "notactive", record[3], record[0])
+				_, err = db.Exec(queryupdate)
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			} else {
+				queryupdate := fmt.Sprintf("UPDATE employees SET date_out = %s , status_employee = %s, exit_statement = %s WHERE number_of_employees = %s ", "0000-00-00", "active", record[3], record[0])
+				_, err = db.Exec(queryupdate)
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
 		}
-		fmt.Println(Count_id)
 
 		var Count_idresigns = 0
 		err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resigns WHERE number_of_employees = ? ", record[0]).
@@ -1561,12 +1564,12 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 			// cord := strings.Join(x, "")
 			// queryinsert := fmt.Sprintf("INSERT INTO resigns(number_of_employees,name, hire_date, classification, date_out, date_resignsubmissions, periode_of_service, type, age, status_resign, printed, created_at, updated_at) VALUES (%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s, %s , %s)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], "", Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
 			// fmt.Println(queryinsert)
-			fmt.Println("Ini Tidak Error")
-			// _, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
-			// if err != nil {
-			// 	fmt.Println(err.Error())
-			// 	return
-			// }
+			// fmt.Println("Ini Tidak Error")
+			_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 
 			each := fmt.Sprintf("NIK %s berhasil di resignkan <br> ", record[0])
 			notification = append(notification, each)
