@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/theTardigrade/age"
+
 	"github.com/gorilla/mux"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -21,14 +23,19 @@ type Employee struct {
 	//penamaan Camel Cas untuk Import Package supaya bisa di pakai dari luar
 	Number_of_employees string `json:"number_of_employees"` // `` cara membuat penamaan ulang pada golang pada saat di GET
 	National_id         string `json:"national_id"`
-}
-
-type Dateemployee struct {
-	Name            string `json:"name"`
-	Date_of_birth   string `json:"date_of_birth"`
-	Hire_date       string `json:"hire_date"`
-	Date_out        string `json:"date_out"`
-	Status_employee string `json:"status_employee"`
+	Name                string `json:"name"`
+	Date_of_birth       string `json:"date_of_birth"`
+	Hire_date           string `json:"hire_date"`
+	Date_out            string `json:"date_out"`
+	Place_of_birth      string `json:"place_of_birth"`
+	Address_jalan       string `json:"address_jalan"`
+	Address_rt          string `json:"address_rt"`
+	Address_rw          string `json:"address_rw"`
+	Address_village     string `json:"address_village"`
+	Address_district    string `json:"address_district"`
+	Address_city        string `json:"address_city"`
+	Address_province    string `json:"address_province"`
+	Status_employee     string `json:"status_employee"`
 }
 
 type Count struct {
@@ -180,6 +187,10 @@ func Rom(stringmonth string) string {
 		Rom = "XII"
 	}
 	return Rom
+}
+
+func Date(year, month, day int) time.Time {
+	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 }
 
 func Conn() (*sql.DB, error) {
@@ -359,15 +370,15 @@ func GetAlamat(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	var Place_of_birth string
-	var Date_of_birth string
-	var Address_jalan string
-	var Address_rt string
-	var Address_rw string
-	var Address_village string
-	var Address_district string
-	var Address_city string
-	var Address_province string
+	var Place_of_birth,
+		Date_of_birth,
+		Address_jalan,
+		Address_rt,
+		Address_rw,
+		Address_village,
+		Address_district,
+		Address_city,
+		Address_province string
 
 	err = db.
 		QueryRow("select  COALESCE(place_of_birth, '') as place_of_birth, COALESCE(date_of_birth, '') as date_of_birth, COALESCE(address_jalan, '') as address_jalan, COALESCE(address_rt, '') as address_rt, COALESCE(address_rw, '') as address_rw, COALESCE(address_village, '') as address_village, COALESCE(address_district, '') as address_district, COALESCE(address_city, '') as address_city, COALESCE(address_province, '') as address_province from employees where number_of_employees = ? ", numner_of_employees).
@@ -414,7 +425,7 @@ func GetResign(w http.ResponseWriter, r *http.Request) {
 	var dbhwi, _ = ConnHwi()
 	defer dbhwi.Close()
 
-	var resultemployee = Dateemployee{}
+	var resultemployee = Employee{}
 
 	number_of_employees := nik
 	national_id := ktp
@@ -852,10 +863,106 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reader := csv.NewReader(uploadedFile)
+
 	records, _ := reader.ReadAll()
 
 	for _, record := range records {
-		fmt.Println(record[0], record[1], record[2], record[3], record[4], record[5])
+		fmt.Println()
+
+		var Count_employees int
+		var Number_of_employees string
+		var Status_employee string
+
+		err = db.
+			QueryRow("select COUNT(id), COALESCE(number_of_employees, 'NULL'), COALESCE(status_employee, 'NULL') FROM employees where number_of_employees = ? ", record[1]).
+			Scan(&Count_employees, &Number_of_employees, &Status_employee)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		if Count_employees != 0 {
+
+			var resultemployee = Employee{}
+			// Menampilkan data karyawan
+			err = db.QueryRow("select name, date_of_birth, hire_date, COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = ? ", Number_of_employees).
+				Scan(&resultemployee.Name, &resultemployee.Date_of_birth, &resultemployee.Hire_date, &resultemployee.Date_out, &resultemployee.Status_employee)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			var Count_resigns int
+			// Cari data resign pada pada database hwi berdasarkan nik
+			err = db.QueryRow("select count(id) as count_resign from resigns where number_of_employees = ?", Number_of_employees).
+				Scan(&Count_resigns)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			var Count_resign_submissions int
+			var Count_status_resign_submissions string
+
+			// Cari data pengajuan resign pada  database HWI
+			err = dbhwi.QueryRow("select count(id) as count_resign_submissions, COALESCE(status_resignsubmisssion, 'NULL') as  status_resignsubmisssion from resignation_submissions where number_of_employees = ?", Number_of_employees).
+				Scan(&Count_resign_submissions, &Count_status_resign_submissions)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			const day, month, year = 2, 1, 1999
+
+			date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+			dateAge := age.Calculate(date)
+
+			fmt.Println(dateAge)
+
+			// ===================== RESULT
+
+			if Count_resigns > 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
+				//Jika sudah resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
+
+				fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan sudah resign")
+
+			} else if Count_resigns == 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
+				//Jika belum resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
+
+				fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan statusnya menunggu")
+
+			} else if Count_resigns == 1 && Count_resign_submissions == 0 {
+				//Sudah resign tapi belum mengajukan resign maka boleh mengajukan
+
+				/*
+					_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" , Number_of_employee, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], 'false', record[3], record[6], [periode_of_service], [age], record[7], 'wait', 'google','Mengajukan permohonan resign setelah karyawan resign', 0, record[0], record[0])
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				*/
+
+				fmt.Println("INSERT DATA Submission type false")
+
+			} else if Count_resigns == 0 && Count_resign_submissions == 0 {
+				// TIdak resign dan belum mengajukan resign maka boleh mengajukan resign
+
+				fmt.Println("INSERT DATA Submission type true")
+				/*
+					_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" , Number_of_employee, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], 'true', record[3], record[6], [periode_of_service], [age], record[7], 'wait', 'google','Mengajukan permohonan resign setelah karyawan resign', 0, record[0], record[0])
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				*/
+
+			} else {
+
+			}
+
+		}
 
 		//Cek data resign == 1 dan pengajuan status !== cancel !== 0
 
@@ -1377,6 +1484,154 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func UploadResigns(w http.ResponseWriter, r *http.Request) {
+
+	db, err := Conn()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	var dbhwi, _ = ConnHwi()
+	defer dbhwi.Close()
+
+	if r.Method != "POST" {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseMultipartForm(1024); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	uploadedFile, _, err := r.FormFile("file")
+
+	if err != nil {
+		log.Fatal("ERROR", err.Error())
+	}
+
+	reader := csv.NewReader(uploadedFile)
+
+	records, _ := reader.ReadAll()
+
+	var notification []string
+
+	var code int = 200
+
+	for _, record := range records {
+
+		var Count_id int
+		var Status_employees string
+		var Employee = Employee{}
+
+		cek := fmt.Sprintf("SELECT COUNT(id) as id , COALESCE(status_employee, ''), COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = '%s' ", record[0])
+		fmt.Println(cek)
+		err = db.QueryRow("SELECT COUNT(id) as id , COALESCE(status_employee, ''), COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = ? ", record[0]).
+			Scan(&Count_id, &Status_employees, &Employee.Name, &Employee.Hire_date, &Employee.Date_of_birth, &Employee.Date_out, &Employee.Address_jalan, &Employee.Address_rt, &Employee.Address_rw, &Employee.Address_village, &Employee.Address_district, &Employee.Address_city, &Employee.Address_province)
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		fmt.Println(Count_id, Status_employees, Employee.Name, Employee.Hire_date, Employee.Date_of_birth, Employee.Date_out, Employee.Address_jalan, Employee.Address_rt, Employee.Address_rw, Employee.Address_village, Employee.Address_district, Employee.Address_city, Employee.Address_province)
+
+		if Count_id > 0 {
+			// if Status_employees == "notactive" {
+			queryupdate := fmt.Sprintf("UPDATE employees SET date_out = %s , status_employee = %s, exit_statement = %s WHERE number_of_employees = %s ", record[2], "notactive", record[3], record[0])
+
+			fmt.Println(queryupdate)
+			// _, err = db.Exec(queryupdate)
+			// if err != nil {
+			// 	fmt.Println(err.Error())
+			// }
+			// }
+		}
+		fmt.Println(Count_id)
+
+		var Count_idresigns = 0
+		err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resigns WHERE number_of_employees = ? ", record[0]).
+			Scan(&Count_idresigns)
+
+		if Count_idresigns < 1 && Count_id > 0 {
+			//INSERT resigns
+
+			// fmt.Println(reflect.TypeOf(record[2]))
+			// cord := strings.Join(x, "")
+			// queryinsert := fmt.Sprintf("INSERT INTO resigns(number_of_employees,name, hire_date, classification, date_out, date_resignsubmissions, periode_of_service, type, age, status_resign, printed, created_at, updated_at) VALUES (%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s, %s , %s)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], "", Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
+			// fmt.Println(queryinsert)
+			fmt.Println("Ini Tidak Error")
+			// _, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
+			// if err != nil {
+			// 	fmt.Println(err.Error())
+			// 	return
+			// }
+
+			each := fmt.Sprintf("NIK %s berhasil di resignkan <br> ", record[0])
+			notification = append(notification, each)
+		} else {
+			each := fmt.Sprintf("NIK %s Tidak dapat resign gagal karena sudah resign <br> ", record[0])
+			code = 404
+			notification = append(notification, each)
+		}
+	}
+
+	//untuk membuat json pertama kita harus set Header
+	w.Header().Set("Content-Type", "application/json")
+
+	result := map[string]interface{}{
+		"code":    code,
+		"data":    notification,
+		"message": "Succesfully",
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write([]byte(resp))
+
+}
+
+func Age(DateString string) int {
+
+	var s string
+	s = DateString
+	yearDate, _ := strconv.Atoi(string(s[0:4]))
+	monthDate, _ := strconv.Atoi(string(s[5:7]))
+	dayDate, _ := strconv.Atoi(string(s[8:10]))
+
+	month := time.Month(monthDate)
+
+	date := time.Date(yearDate, month, dayDate, 0, 0, 0, 0, time.UTC)
+	dateAge := age.Calculate(date)
+
+	return dateAge
+}
+
+func Periode_of_serve(DateString string, DateString2 string) int {
+
+	var s string
+	s = DateString
+	yearDate, _ := strconv.Atoi(string(s[0:4]))
+	monthDate, _ := strconv.Atoi(string(s[5:7]))
+	dayDate, _ := strconv.Atoi(string(s[8:10]))
+
+	var s2 string
+	// s2 = strings.Join(DateString2, "")
+	s2 = DateString2
+	yearDate2, _ := strconv.Atoi(string(s2[0:4]))
+	monthDate2, _ := strconv.Atoi(string(s2[5:7]))
+	dayDate2, _ := strconv.Atoi(string(s2[8:10]))
+
+	t1 := Date(yearDate, monthDate, dayDate)
+	t2 := Date(yearDate2, monthDate2, dayDate2)
+	days := t2.Sub(t1).Hours() / 24
+	return int(days)
+}
+
 /*
 	func Update(w http.ResponseWriter, r *http.Request) {
 		//untuk membuat json pertama kita harus set Header
@@ -1476,6 +1731,7 @@ func main() {
 	//Resigns
 	r.HandleFunc("/resigns", GetResigns).Methods("GET")
 	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
+	r.HandleFunc("/resigns/upload", UploadResigns).Methods("POST")
 
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
