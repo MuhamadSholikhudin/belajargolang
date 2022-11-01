@@ -24,6 +24,8 @@ type Employee struct {
 	Number_of_employees string `json:"number_of_employees"` // `` cara membuat penamaan ulang pada golang pada saat di GET
 	National_id         string `json:"national_id"`
 	Name                string `json:"name"`
+	Job_id              string `json:"job_id"`
+	Department_id       string `json:"department_id"`
 	Date_of_birth       string `json:"date_of_birth"`
 	Hire_date           string `json:"hire_date"`
 	Date_out            string `json:"date_out"`
@@ -866,6 +868,10 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 
 	records, _ := reader.ReadAll()
 
+	var notification []string
+	notification = append(notification, "")
+	var code int = 200
+
 	for _, record := range records {
 		fmt.Println()
 
@@ -874,18 +880,18 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 		var Status_employee string
 
 		err = db.
-			QueryRow("select COUNT(id), COALESCE(number_of_employees, 'NULL'), COALESCE(status_employee, 'NULL') FROM employees where number_of_employees = ? ", record[1]).
+			QueryRow("select COUNT(id), COALESCE(number_of_employees, 'NULL'), COALESCE(status_employee, 'NULL') FROM employees where number_of_employees = '?' ", record[1]).
 			Scan(&Count_employees, &Number_of_employees, &Status_employee)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		if Count_employees != 0 {
-
+		switch Count_employees {
+		case 1: // Karyawan di temukan
 			var resultemployee = Employee{}
 			// Menampilkan data karyawan
-			err = db.QueryRow("select name, date_of_birth, hire_date, COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = ? ", Number_of_employees).
+			err = db.QueryRow("select name, COALESCE(date_of_birth, '0000-00-00'), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = '?' ", Number_of_employees).
 				Scan(&resultemployee.Name, &resultemployee.Date_of_birth, &resultemployee.Hire_date, &resultemployee.Date_out, &resultemployee.Status_employee)
 			if err != nil {
 				fmt.Println(err.Error())
@@ -894,7 +900,7 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 
 			var Count_resigns int
 			// Cari data resign pada pada database hwi berdasarkan nik
-			err = db.QueryRow("select count(id) as count_resign from resigns where number_of_employees = ?", Number_of_employees).
+			err = dbhwi.QueryRow("select count(id) as count_resign from resigns where number_of_employees = '?' ", Number_of_employees).
 				Scan(&Count_resigns)
 			if err != nil {
 				fmt.Println(err.Error())
@@ -905,7 +911,7 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 			var Count_status_resign_submissions string
 
 			// Cari data pengajuan resign pada  database HWI
-			err = dbhwi.QueryRow("select count(id) as count_resign_submissions, COALESCE(status_resignsubmisssion, 'NULL') as  status_resignsubmisssion from resignation_submissions where number_of_employees = ?", Number_of_employees).
+			err = dbhwi.QueryRow("select count(id) as count_resign_submissions, COALESCE(status_resignsubmisssion, 'NULL') as  status_resignsubmisssion from resignation_submissions where number_of_employees = '?' ", Number_of_employees).
 				Scan(&Count_resign_submissions, &Count_status_resign_submissions)
 			if err != nil {
 				fmt.Println(err.Error())
@@ -926,59 +932,74 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 
 				fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan sudah resign")
 
+				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah mengajukan resign dan status karyawan sudah resign.", Number_of_employees)
+				notification = append(notification, each)
+				code = 400
+
 			} else if Count_resigns == 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 				//Jika belum resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
 
 				fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan statusnya menunggu")
 
+				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah resign dengan status pengajuan wait.", Number_of_employees)
+				notification = append(notification, each)
+				code = 400
+
 			} else if Count_resigns == 1 && Count_resign_submissions == 0 {
 				//Sudah resign tapi belum mengajukan resign maka boleh mengajukan
 
-				/*
-					_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" , Number_of_employee, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], 'false', record[3], record[6], [periode_of_service], [age], record[7], 'wait', 'google','Mengajukan permohonan resign setelah karyawan resign', 0, record[0], record[0])
-					if err != nil {
-						fmt.Println(err.Error())
-						return
-					}
-				*/
-
+				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], "false", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
 				fmt.Println("INSERT DATA Submission type false")
+
+				_, err = dbhwi.Exec("INSERT INTO `kuesioners`( `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?) ", Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
 
 			} else if Count_resigns == 0 && Count_resign_submissions == 0 {
 				// TIdak resign dan belum mengajukan resign maka boleh mengajukan resign
 
+				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], "true", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
 				fmt.Println("INSERT DATA Submission type true")
-				/*
-					_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" , Number_of_employee, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], 'true', record[3], record[6], [periode_of_service], [age], record[7], 'wait', 'google','Mengajukan permohonan resign setelah karyawan resign', 0, record[0], record[0])
-					if err != nil {
-						fmt.Println(err.Error())
-						return
-					}
-				*/
 
-			} else {
-
+				_, err = dbhwi.Exec("INSERT INTO `kuesioners`( `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?) ", Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
 			}
 
+		default:
+			each := fmt.Sprintf("NIK ini %s data karyawan tidak di temukan.", Number_of_employees)
+			notification = append(notification, each)
+			code = 400
 		}
-
-		//Cek data resign == 1 dan pengajuan status !== cancel !== 0
-
-		//Cek data resign jika sudah resign maka clasifikasi sudah resign baru
-
-		//Cek data pengajuan ada apa tidak jika tidak ada maka insert data
-
 	}
 
-	//Upload file data excel
+	//untuk membuat json pertama kita harus set Header
+	w.Header().Set("Content-Type", "application/json")
 
-	//Cek data resign == 1 dan pengajuan status !== cancel !== 0
+	result := map[string]interface{}{
+		"code":    code,
+		"data":    notification,
+		"message": "Succesfully",
+	}
 
-	//Cek data resign jika sudah resign maka clasifikasi sudah resign baru
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
-	//Cek data pengajuan ada apa tidak jika tidak ada maka insert data
+	w.Write([]byte(resp))
 
 }
 
@@ -1517,64 +1538,86 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 	records, _ := reader.ReadAll()
 
 	var notification []string
-
+	notification = append(notification, "")
 	var code int = 200
-
+	var Employee = Employee{}
+	var Count_id int
 	for _, record := range records {
 
-		var Count_id int
-		var Status_employees string
-		var Employee = Employee{}
-
-		cek := fmt.Sprintf("SELECT COUNT(id) as id , COALESCE(status_employee, ''), COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = '%s' ", record[0])
-		fmt.Println(cek)
-		err = db.QueryRow("SELECT COUNT(id) as id , COALESCE(status_employee, ''), COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = ? ", record[0]).
-			Scan(&Count_id, &Status_employees, &Employee.Name, &Employee.Hire_date, &Employee.Date_of_birth, &Employee.Date_out, &Employee.Address_jalan, &Employee.Address_rt, &Employee.Address_rw, &Employee.Address_village, &Employee.Address_district, &Employee.Address_city, &Employee.Address_province)
+		err = db.QueryRow("SELECT COUNT(id) as id , COALESCE(status_employee, '') as status_employee, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'),COALESCE(job_id, 25),COALESCE(department_id, 116), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = ? ", record[0]).
+			Scan(&Count_id, &Employee.Status_employee, &Employee.Name, &Employee.Hire_date, &Employee.Date_of_birth, &Employee.Date_out, &Employee.Job_id, &Employee.Department_id, &Employee.Address_jalan, &Employee.Address_rt, &Employee.Address_rw, &Employee.Address_village, &Employee.Address_district, &Employee.Address_city, &Employee.Address_province)
 
 		if err != nil {
 			fmt.Println(err.Error())
 		}
 
-		fmt.Println(Count_id, Status_employees, Employee.Name, Employee.Hire_date, Employee.Date_of_birth, Employee.Date_out, Employee.Address_jalan, Employee.Address_rt, Employee.Address_rw, Employee.Address_village, Employee.Address_district, Employee.Address_city, Employee.Address_province)
-
+		// fmt.Println("Ini Count_id ", Count_id, Employee.Status_employee, Employee.Name, Employee.Hire_date, Employee.Date_of_birth, Employee.Date_out, Employee.Address_jalan, Employee.Address_rt, Employee.Address_rw, Employee.Address_village, Employee.Address_district, Employee.Address_city, Employee.Address_province)
 		if Count_id > 0 {
-			if Status_employees == "notactive" {
-				queryupdate := fmt.Sprintf("UPDATE employees SET date_out = %s , status_employee = %s, exit_statement = %s WHERE number_of_employees = %s ", record[2], "notactive", record[3], record[0])
+			// 	fmt.Println("Status ini => ", Employee.Status_employee)
+
+			switch Employee.Status_employee {
+			case "active":
+				_, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			case "notactive":
+				queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", "0000-00-00", "active", record[3], record[0])
 				_, err = db.Exec(queryupdate)
 				if err != nil {
 					fmt.Println(err.Error())
 				}
-			} else {
-				queryupdate := fmt.Sprintf("UPDATE employees SET date_out = %s , status_employee = %s, exit_statement = %s WHERE number_of_employees = %s ", "0000-00-00", "active", record[3], record[0])
-				_, err = db.Exec(queryupdate)
-				if err != nil {
-					fmt.Println(err.Error())
-				}
+			default:
+				fmt.Println("Tidak Melakukan Transaksi update data karyawan")
 			}
+
+			/*
+				if Employee.Status_employee == "active" {
+					queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", record[2], "notactive", record[3], record[0])
+					_, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
+					if err != nil {
+						fmt.Println(err.Error())
+					}
+					fmt.Println("UPDATE SUKSES")
+					fmt.Println(queryupdate)
+				} else if Employee.Status_employee == "notactive" {
+					fmt.Println("Status ini notactive => aslinya ", Employee.Status_employee)
+					queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", "0000-00-00", "active", record[3], record[0])
+					_, err = db.Exec(queryupdate)
+					if err != nil {
+						fmt.Println(err.Error())
+					}
+					fmt.Println(queryupdate)
+				}
+			*/
 		}
 
 		var Count_idresigns = 0
 		err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resigns WHERE number_of_employees = ? ", record[0]).
 			Scan(&Count_idresigns)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 
-		if Count_idresigns < 1 && Count_id > 0 {
-			//INSERT resigns
+		if record[0] == "number_of_employees" {
 
-			// fmt.Println(reflect.TypeOf(record[2]))
-			// cord := strings.Join(x, "")
-			// queryinsert := fmt.Sprintf("INSERT INTO resigns(number_of_employees,name, hire_date, classification, date_out, date_resignsubmissions, periode_of_service, type, age, status_resign, printed, created_at, updated_at) VALUES (%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s,	%s, %s , %s)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], "", Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
-			// fmt.Println(queryinsert)
-			// fmt.Println("Ini Tidak Error")
-			_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
+		} else if Count_idresigns < 1 && Count_id > 0 {
+			var Job_level, Department string
+			err = db.QueryRow("SELECT job_level FROM jobs WHERE id = ?", Employee.Job_id).Scan(&Job_level)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			err = db.QueryRow("SELECT department FROM departments WHERE id = ?", Employee.Department_id).Scan(&Department)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, Job_level, Department, Employee.Hire_date, "Resign dahulu sebelum mengajukan resign", record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
-
-			each := fmt.Sprintf("NIK %s berhasil di resignkan <br> ", record[0])
-			notification = append(notification, each)
 		} else {
-			each := fmt.Sprintf("NIK %s Tidak dapat resign gagal karena sudah resign <br> ", record[0])
+			each := fmt.Sprintf("NIK %s Tidak dapat resign karena sudah resign </br>", record[0])
 			code = 404
 			notification = append(notification, each)
 		}
