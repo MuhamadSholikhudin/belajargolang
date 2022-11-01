@@ -873,7 +873,7 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 	var code int = 200
 
 	for _, record := range records {
-		fmt.Println()
+
 
 		var Count_employees int
 		var Number_of_employees string
@@ -918,12 +918,12 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			const day, month, year = 2, 1, 1999
+			// const day, month, year = 2, 1, 1999
 
-			date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-			dateAge := age.Calculate(date)
+			// date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+			// dateAge := age.Calculate(date)
 
-			fmt.Println(dateAge)
+			// fmt.Println(dateAge)
 
 			// ===================== RESULT
 
@@ -945,7 +945,7 @@ func UploadExcelSubmission(w http.ResponseWriter, r *http.Request) {
 				notification = append(notification, each)
 				code = 400
 
-			} else if Count_resigns == 1 && Count_resign_submissions == 0 {
+			} else if Count_resigns == 1 &&                                                                                                                                                                                                                                                                                          == 0 {
 				//Sudah resign tapi belum mengajukan resign maka boleh mengajukan
 
 				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], "false", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
@@ -1676,6 +1676,43 @@ func Periode_of_serve(DateString string, DateString2 string) int {
 	t2 := Date(yearDate2, monthDate2, dayDate2)
 	days := t2.Sub(t1).Hours() / 24
 	return int(days)
+}
+
+func AddDate(Number_of_employees string) bool{
+
+	var Count_id int
+	var Submission ResignSubmission{}
+	err = db.QueryRow("SELECT COUNT(id) as id, COALESCE(date_resignsubmission, '0000-00-00') FROM resignation_submisssion WHERE number_of_employees = ? AND status_resignsubmission = 'wait'  ", Number_of_employees)
+	.Scan(&Count_id, &Submission.Date_resignsubmission)
+	
+	var output string
+	switch Count_id {
+	case 1:
+
+		var s string
+		s = Submission.Date_resignsubmission
+		yearDate, _ := strconv.Atoi(string(s[0:4]))
+		monthDate, _ := strconv.Atoi(string(s[5:7]))
+		dayDate, _ := strconv.Atoi(string(s[8:10]))
+	
+		month := time.Month(monthDate)
+	
+		theTime := time.Date(yearDate, month, dayDate, 0, 0, 0, 0,time.Local)
+		fmt.Println("The time is", theTime)
+	
+		fmt.Println(theTime.Format("2006-1-2 15:4:5"))
+	
+		after := theTime.AddDate(1, 0, 0)
+		fmt.Println("\nAdd 1 Year:", after)
+
+		output = true
+
+	default:
+		output = true
+	}
+
+	return output
+
 }
 
 /*
