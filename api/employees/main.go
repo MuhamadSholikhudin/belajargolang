@@ -89,7 +89,7 @@ type Resign struct {
 	Classification         string `json:"classification"`
 	Date_out               string `json:"date_out"`
 	Date_resignsubmissions string `json:"date_resignsubmissions"`
-	Periode_of_service     string `json:"periode_of_service"`
+	Periode_of_service     int    `json:"periode_of_service"`
 	Type                   string `json:"type"`
 	Age                    int    `json:"age"`
 	Status_resign          string `json:"status_resign"`
@@ -1005,7 +1005,6 @@ func GetEditSubmission(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	Number_of_employess, _ := strconv.Atoi(vars["number_of_employees"])
-	fmt.Println(Number_of_employess)
 
 	var dbhwi, err = ConnHwi()
 	if err != nil {
@@ -1051,7 +1050,7 @@ func GetUpdateSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dbhwi.Close()
 
-	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignation_submissions`= ? ,`type`= ? ,`reason`= ? ,`detail_reason`= ? ,`periode_of_service`= ? ,`age`= ? ,`suggestion`= ? ,`status_resignsubmisssion`= ? ,`using_media`= ? ,`classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignation_submissions, data.Type, data.Reason, data.Detail_reason, data.Periode_of_service, data.Age, data.Suggestion, data.Status_resignsubmisssion, data.Using_media, data.Classification, data.Created_at, data.Updated_at)
+	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignation_submissions`= ? ,`type`= ? ,`reason`= ? ,`detail_reason`= ? ,`periode_of_service`= ? ,`age`= ? ,`suggestion`= ? ,`status_resignsubmisssion`= ? ,`using_media`= ? ,`classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignation_submissions, data.Type, data.Reason, data.Detail_reason, Periode_of_serve(data.Hire_date, data.Date_resignation_submissions), data.Age, data.Suggestion, data.Status_resignsubmisssion, data.Using_media, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
 	if err != nil {
 
 		result := map[string]interface{}{
@@ -1063,12 +1062,14 @@ func GetUpdateSubmission(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
+		fmt.Println(400)
 		w.Write([]byte(resp))
 		return
 	}
 
 	result := map[string]interface{}{
 		"code":    200,
+		"data":    data,
 		"message": "Update Success",
 	}
 
@@ -1078,7 +1079,6 @@ func GetUpdateSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(resp))
-
 }
 
 func GetGedungs(w http.ResponseWriter, r *http.Request) {
@@ -1491,6 +1491,87 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func GetEditResign(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+
+	Number_of_employess, _ := strconv.Atoi(vars["number_of_employees"])
+
+	var dbhwi, err = ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	var Resign Resign
+
+	err = dbhwi.QueryRow("SELECT number_of_employees, name, position, department,  hire_date, date_out, date_resignsubmissions, type,  periode_of_service, status_resign, age,  classification, created_at, updated_at  FROM resigns WHERE number_of_employees = ? ", Number_of_employess).
+		Scan(&Resign.Number_of_employees, &Resign.Name, &Resign.Position, &Resign.Department, &Resign.Hire_date, &Resign.Date_out, &Resign.Date_resignsubmissions, &Resign.Type, &Resign.Periode_of_service, &Resign.Status_resign, &Resign.Age, &Resign.Classification, &Resign.Created_at, &Resign.Updated_at)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	result := map[string]interface{}{
+		"data": Resign,
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Write([]byte(resp))
+
+}
+
+func GetUpdateResign(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "application/json")
+
+	data := Resign{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	_, err = dbhwi.Exec("UPDATE `resign` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignsubmissions`= ? ,`type`= ? , `periode_of_service`= ? ,`age`= ? ,`status_resign`= ? , `classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignsubmissions, data.Type, Periode_of_serve(data.Hire_date, data.Date_resignsubmissions), data.Age, data.Status_resign, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
+	if err != nil {
+
+		result := map[string]interface{}{
+			"code":    400,
+			"message": "Update Loss",
+		}
+		resp, _ := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		fmt.Println(400)
+		w.Write([]byte(resp))
+		return
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    data,
+		"message": "Update Success",
+	}
+
+	resp, _ := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Write([]byte(resp))
+}
+
 func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 
 	//untuk membuat json pertama kita harus set Header
@@ -1578,7 +1659,6 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(resp))
-
 }
 
 func UploadResigns(w http.ResponseWriter, r *http.Request) {
@@ -1904,6 +1984,8 @@ func main() {
 	r.HandleFunc("/resigns", GetResigns).Methods("GET")
 	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
 	r.HandleFunc("/resigns/upload", UploadResigns).Methods("POST")
+	r.HandleFunc("/resigns_edit/{number_of_employees}", GetEditResign).Methods("GET")
+	r.HandleFunc("/resigns_update", GetUpdateResign).Methods("POST")
 
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
