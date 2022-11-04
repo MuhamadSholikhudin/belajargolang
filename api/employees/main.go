@@ -1015,7 +1015,7 @@ func GetEditSubmission(w http.ResponseWriter, r *http.Request) {
 
 	var Submission ResignSubmission
 
-	err = dbhwi.QueryRow("SELECT number_of_employees, name, position, department, building, hire_date, date_out, date_resignation_submissions, type, reason, detail_reason, suggestion, periode_of_service, status_resignsubmisssion, age, using_media, classification, created_at, updated_at  FROM resignation_submissions WHERE number_of_employees = ? ", Number_of_employess).
+	err = dbhwi.QueryRow("SELECT number_of_employees, COALESCE(name, ''), COALESCE(position, ''), COALESCE(department, ''), COALESCE(building, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(date_resignation_submissions, '0000-00-00'), COALESCE(type, ''), COALESCE(reason, ''), COALESCE(detail_reason, ''), COALESCE(suggestion, ''), COALESCE(periode_of_service, 0), COALESCE(status_resignsubmisssion, ''), COALESCE(age, 0), COALESCE(using_media, ''), COALESCE(classification, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00')  FROM resignation_submissions WHERE number_of_employees = ? ", Number_of_employess).
 		Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Suggestion, &Submission.Periode_of_service, &Submission.Status_resignsubmisssion, &Submission.Age, &Submission.Using_media, &Submission.Classification, &Submission.Created_at, &Submission.Updated_at)
 
 	if err != nil {
@@ -1365,7 +1365,7 @@ func GetResigns(w http.ResponseWriter, r *http.Request) {
 	}
 	q := u.Query()
 
-	var sqlPaging string = "SELECT id, number_of_employees, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(classification, ''), COALESCE(date_out, ''), COALESCE(date_resignsubmissions, ''), COALESCE(periode_of_service, ''), COALESCE(position, ''), COALESCE(department, ''), COALESCE(type, ''), COALESCE(age, ''), COALESCE(status_resign, ''), COALESCE(printed, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resigns"
+	var sqlPaging string = "SELECT id, number_of_employees, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(classification, ''), COALESCE(date_out, ''), COALESCE(date_resignsubmissions, ''), COALESCE(periode_of_service, 0), COALESCE(position, ''), COALESCE(department, ''), COALESCE(type, ''), COALESCE(age, ''), COALESCE(status_resign, ''), COALESCE(printed, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM resigns"
 	var sqlCount string = "SELECT COUNT(*) FROM resigns"
 	var params string = ""
 
@@ -1507,7 +1507,7 @@ func GetEditResign(w http.ResponseWriter, r *http.Request) {
 
 	var Resign Resign
 
-	err = dbhwi.QueryRow("SELECT number_of_employees, name, position, department,  hire_date, date_out, date_resignsubmissions, type,  periode_of_service, status_resign, age,  classification, created_at, updated_at  FROM resigns WHERE number_of_employees = ? ", Number_of_employess).
+	err = dbhwi.QueryRow("SELECT number_of_employees, COALESCE(name, ''), COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(date_resignsubmissions, '0000-00-00'), COALESCE(type, ''), COALESCE(periode_of_service, 0), COALESCE(status_resign, ''), COALESCE(age, 0), COALESCE(classification, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00')  FROM resigns WHERE number_of_employees = ? ", Number_of_employess).
 		Scan(&Resign.Number_of_employees, &Resign.Name, &Resign.Position, &Resign.Department, &Resign.Hire_date, &Resign.Date_out, &Resign.Date_resignsubmissions, &Resign.Type, &Resign.Periode_of_service, &Resign.Status_resign, &Resign.Age, &Resign.Classification, &Resign.Created_at, &Resign.Updated_at)
 
 	if err != nil {
@@ -1542,9 +1542,9 @@ func GetUpdateResign(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dbhwi.Close()
 
-	_, err = dbhwi.Exec("UPDATE `resign` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignsubmissions`= ? ,`type`= ? , `periode_of_service`= ? ,`age`= ? ,`status_resign`= ? , `classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignsubmissions, data.Type, Periode_of_serve(data.Hire_date, data.Date_resignsubmissions), data.Age, data.Status_resign, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
+	_, err = dbhwi.Exec("UPDATE `resigns` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignsubmissions`= ? ,`type`= ? , `periode_of_service`= ? ,`age`= ? ,`status_resign`= ? , `classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignsubmissions, data.Type, Periode_of_serve(data.Hire_date, data.Date_resignsubmissions), data.Age, data.Status_resign, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
 	if err != nil {
-
+		fmt.Println(err.Error())
 		result := map[string]interface{}{
 			"code":    400,
 			"message": "Update Loss",
@@ -1553,8 +1553,6 @@ func GetUpdateResign(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-
-		fmt.Println(400)
 		w.Write([]byte(resp))
 		return
 	}
@@ -1592,7 +1590,7 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 
 	var Resign_id int
 	var ResignSel = Resign{}
-	err = db.QueryRow("SELECT id as resign_id, name, position, department, hire_date, date_out FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
+	err = db.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -1625,6 +1623,95 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	var certifictaeofemploment = Letter{}
 
 	err = db.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
+		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	certificate := map[string]interface{}{
+		"id":                  certifictaeofemploment.Id,
+		"resign_id":           certifictaeofemploment.Resign_id,
+		"number_of_employees": certifictaeofemploment.Number_of_employees,
+		"name":                ResignSel.Name,
+		"position":            ResignSel.Position,
+		"department":          ResignSel.Department,
+		"hire_date":           ResignSel.Hire_date,
+		"date_out":            ResignSel.Date_out,
+		"date":                certifictaeofemploment.Date,
+		"no":                  certifictaeofemploment.No,
+		"rom":                 certifictaeofemploment.Rom,
+		"created_at":          certifictaeofemploment.Created_at,
+		"updated_at":          certifictaeofemploment.Updated_at,
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    certificate,
+		"message": "Succesfully",
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write([]byte(resp))
+}
+
+func PostExperience(w http.ResponseWriter, r *http.Request) {
+
+	//untuk membuat json pertama kita harus set Header
+	w.Header().Set("Content-Type", "application/json")
+
+	data := Letter{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	db, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	var Resign_id int
+	var ResignSel = Resign{}
+	err = db.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
+		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
+	var CountCertifcateNumberOf_employees int
+
+	err = db.QueryRow("SELECT COUNT(*) FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees).
+		Scan(&CountCertifcateNumberOf_employees)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
+	if CountCertifcateNumberOf_employees == 0 {
+		var CountCertificateByDate, CountNoCertificateEmployee int
+		var yearstring string
+		yearstring = strconv.Itoa(time.Now().Year())
+		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", yearstring, StringMonth()).
+			Scan(&CountCertificateByDate, &CountNoCertificateEmployee)
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+		// create certificate
+		_, err := db.Exec("INSERT INTO work_experience_letters (resign_id, number_of_employees, date_letter_exprerience, no_letter_experience, rom, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", Resign_id, data.Number_of_employees, DMY(), (CountNoCertificateEmployee + 1), Rom(StringMonth()), DMYhms(), DMYhms())
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+	}
+
+	var certifictaeofemploment = Letter{}
+
+	err = db.QueryRow("SELECT id, resign_id, number_of_employees, date_letter_exprerience, no_letter_experience, rom, created_at, updated_at FROM work_experience_letters WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
 
 	if err != nil {
@@ -1795,6 +1882,289 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte(resp))
 
+}
+
+func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	db, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	var count_certificate_of_employments int
+
+	err = db.QueryRow("SELECT COUNT(id) as count_certificate_of_employments FROM certificate_of_employments ").
+		Scan(&count_certificate_of_employments)
+	if count_certificate_of_employments == 0 {
+		var datanull = []map[string]string{
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_certificate_employee": "NULL", "no_certificate_employee": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+		}
+
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
+		}
+
+		resp, err := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		w.Write([]byte(resp))
+		return
+	}
+	u, err := url.Parse(r.RequestURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	q := u.Query()
+
+	var sqlPaging string = "SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_certificate_employee, '0000-00-00'), COALESCE(no_certificate_employee, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM certificate_of_employments"
+	var sqlCount string = "SELECT COUNT(*) FROM certificate_of_employments"
+	var params string = ""
+
+	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
+	if checkNumber_of_employees != false {
+		justStringnumber_of_employees := strings.Join(number_of_employees, "")
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlPaging, justStringnumber_of_employees)
+		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
+		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
+	}
+
+	var total int64
+	db.QueryRow(sqlCount).Scan(&total)
+	if total == 0 {
+		var datanull = []map[string]string{
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_certificate_employee": "NULL", "no_certificate_employee": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+		}
+
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
+		}
+
+		resp, err := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		w.Write([]byte(resp))
+		return
+	}
+
+	var totalminbyperpage, lastPage int64
+	totalminbyperpage = total - ((total / 10) * 10)
+
+	if totalminbyperpage == 0 {
+		lastPage = (total / 10)
+	} else {
+		lastPage = ((total / 10) + 1)
+	}
+
+	page, _ := strconv.Atoi("1")
+	cpage, checkPage := q["page"]
+	if checkPage != false {
+		spage, _ := strconv.Atoi(strings.Join(cpage, ""))
+		page = spage
+	}
+
+	var first, last, next, prev string
+	first, last, next, prev = "", "", "", ""
+
+	first = "1"
+	last = strconv.Itoa(int(lastPage))
+
+	next = strconv.Itoa(int(page + 1))
+	if int(page+1) >= int(lastPage) {
+		next = strconv.Itoa(int(lastPage))
+	}
+
+	prev = strconv.Itoa(int(page - 1))
+	if int(page) == 1 {
+		prev = strconv.Itoa(int(page))
+	}
+
+	perPage, _ := strconv.Atoi("10")
+	sqlPaging = fmt.Sprintf("%s LIMIT %d OFFSET %d", sqlPaging, perPage, (page-1)*perPage)
+
+	rows, err := db.Query(sqlPaging)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer rows.Close()
+
+	var letter []map[string]interface{}
+
+	for rows.Next() {
+		var each = Letter{}
+		var err = rows.Scan(&each.Id, &each.Resign_id, &each.Number_of_employees, &each.Date, &each.No, &each.Rom, &each.Created_at, &each.Updated_at)
+
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		var Resign Resign
+		err = db.QueryRow("SELECT name, hire_date, date_out, position, department FROM resigns WHERE id = ? ", each.Resign_id).
+			Scan(&Resign.Name, &Resign.Hire_date, &Resign.Date_out, &Resign.Position, &Resign.Department)
+
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		var data = map[string]interface{}{"id": each.Id, "number_of_employees": each.Number_of_employees, "name": Resign.Name, "hire_date": Resign.Hire_date, "date_out": Resign.Date_out, "position": Resign.Position, "department": Resign.Department, "date_certificate_employee": each.Date, "no": each.No, "rom": each.Rom, "created_at": each.Created_at, "update_at": each.Updated_at}
+
+		letter = append(letter, data)
+	}
+
+	links := map[string]interface{}{
+		"first": fmt.Sprintf("page=%s%s", first, params),
+		"last":  fmt.Sprintf("page=%s%s", last, params),
+		"next":  fmt.Sprintf("page=%s%s", next, params),
+		"prev":  fmt.Sprintf("page=%s%s", prev, params),
+	}
+
+	informationpages := map[string]interface{}{
+		"currentPage": page,
+		"from":        ((page - 1) * 10) + 1,
+		"lastPage":    lastPage,
+		"perPage":     10,
+		"to":          ((page - 1) * 10) + len(letter),
+		"total":       total,
+	}
+
+	pages := map[string]interface{}{
+		"page": informationpages,
+	}
+
+	result := map[string]interface{}{
+		"code":  200,
+		"meta":  pages,
+		"data":  letter,
+		"links": links,
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	w.Write([]byte(resp))
+
+}
+
+func GetEditParklaringCertificate(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+
+	Number_of_employess, _ := strconv.Atoi(vars["number_of_employees"])
+
+	var dbhwi, err = ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	var letter Letter
+
+	err = dbhwi.QueryRow("SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_certificate_employee, '0000-00-00'), COALESCE(no_certificate_employee, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM certificate_of_employments WHERE number_of_employees = ? ", Number_of_employess).
+		Scan(&letter.Id, &letter.Resign_id, &letter.Number_of_employees, &letter.Date, &letter.No, &letter.Rom, &letter.Created_at, &letter.Updated_at)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	var resign Resign
+
+	err = dbhwi.QueryRow("SELECT COALESCE(name, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(position, ''), COALESCE(department, '') FROM resigns WHERE id = ? ", letter.Resign_id).
+		Scan(&resign.Name, &resign.Hire_date, &resign.Date_out, &resign.Position, &resign.Department)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	data := map[string]interface{}{
+		"id":                        letter.Id,
+		"name":                      resign.Name,
+		"number_of_employees":       letter.Number_of_employees,
+		"hire_date":                 resign.Hire_date,
+		"date_out":                  resign.Date_out,
+		"position":                  resign.Position,
+		"department":                resign.Department,
+		"date_certificate_employee": letter.Date,
+		"no_certificate_employee":   letter.No,
+		"rom":                       letter.Rom,
+		"created_at":                letter.Created_at,
+		"updated_at":                letter.Updated_at,
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    data,
+		"message": "Successfully",
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Write([]byte(resp))
+
+}
+
+func GetUpdateParklaringCertificate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "application/json")
+
+	data := Letter{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	_, err = dbhwi.Exec("UPDATE `certificate_of_employments` SET `date_certificate_employee`= ? ,`no_certificate_employee`= ? ,`rom`=  ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Date, data.No, data.Rom, data.Created_at, data.Updated_at, data.Number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		result := map[string]interface{}{
+			"code":    400,
+			"message": "Update Loss",
+		}
+		resp, _ := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		w.Write([]byte(resp))
+		return
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    data,
+		"message": "Update Success",
+	}
+
+	resp, _ := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Write([]byte(resp))
 }
 
 func Age(DateString string) int {
@@ -1982,10 +2352,16 @@ func main() {
 
 	//Resigns
 	r.HandleFunc("/resigns", GetResigns).Methods("GET")
-	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
 	r.HandleFunc("/resigns/upload", UploadResigns).Methods("POST")
 	r.HandleFunc("/resigns_edit/{number_of_employees}", GetEditResign).Methods("GET")
 	r.HandleFunc("/resigns_update", GetUpdateResign).Methods("POST")
+	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
+	r.HandleFunc("/resigns/makeexperience", PostExperience).Methods("POST")
+
+	//Parklaring
+	r.HandleFunc("/parklarings_certificate", GetParklaringCertificates).Methods("GET")
+	r.HandleFunc("/parklarings_certificateedit/{number_of_employees}", GetEditParklaringCertificate).Methods("GET")
+	r.HandleFunc("/parklarings_certificateupdate", GetUpdateParklaringCertificate).Methods("POST")
 
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
