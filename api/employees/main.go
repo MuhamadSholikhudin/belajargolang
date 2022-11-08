@@ -1,17 +1,22 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/theTardigrade/age"
 
 	"github.com/gorilla/mux"
@@ -1917,6 +1922,7 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(resp))
 		return
 	}
+
 	u, err := url.Parse(r.RequestURI)
 	if err != nil {
 		log.Fatal(err)
@@ -2167,6 +2173,216 @@ func GetUpdateParklaringCertificate(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(resp))
 }
 
+func ExportSubmission(w http.ResponseWriter, r *http.Request) {
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	rows, err := dbhwi.Query("select number_of_employees from resignation_submissions where id > ?", 0)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer rows.Close()
+
+	xlsx := excelize.NewFile()
+	sheet1Name := "Sheet1"
+
+	xlsx.SetSheetName(xlsx.GetSheetName(1), sheet1Name)
+
+	err = xlsx.AutoFilter(sheet1Name, "A1", "Q1", "")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	xlsx.SetCellValue(sheet1Name, "A1", "NIK")
+	xlsx.SetCellValue(sheet1Name, "B1", "NAME")
+	xlsx.SetCellValue(sheet1Name, "C1", "POSISI")
+	xlsx.SetCellValue(sheet1Name, "D1", "DEPARTMENT")
+	xlsx.SetCellValue(sheet1Name, "E1", "GEDUNG")
+	xlsx.SetCellValue(sheet1Name, "F1", "HIRE DATE =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
+	xlsx.SetCellValue(sheet1Name, "G1", "DATE OUT =DATE(LEFT(G2,4), MID(G2,6,2), RIGHT(G2,2))")
+	xlsx.SetCellValue(sheet1Name, "H1", "TYPE")
+	xlsx.SetCellValue(sheet1Name, "I1", "ALASAM")
+	xlsx.SetCellValue(sheet1Name, "J1", "ALASAN TAMBAHAN")
+	xlsx.SetCellValue(sheet1Name, "K1", "UMUR")
+	xlsx.SetCellValue(sheet1Name, "L1", "SARAN")
+	xlsx.SetCellValue(sheet1Name, "M1", "STATUS RESIGN")
+	xlsx.SetCellValue(sheet1Name, "N1", "USING MEDIA")
+	xlsx.SetCellValue(sheet1Name, "O1", "CLASSIFIKASI")
+	xlsx.SetCellValue(sheet1Name, "P1", "CREATEAD AT")
+	xlsx.SetCellValue(sheet1Name, "Q1", "UPDATED AT")
+	xlsx.SetCellValue(sheet1Name, "R1", "TGL PERMOHONAN =DATE(LEFT(R2,4), MID(R2,6,2), RIGHT(R2,2))")
+
+	var wg sync.WaitGroup
+
+	no := 1
+
+	for rows.Next() {
+		var NIK string
+		var err = rows.Scan(&NIK)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		no += 1
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, message string, no int) {
+			defer wg.Done()
+			var Submission ResignSubmission
+
+			err = dbhwi.QueryRow("SELECT COALESCE(number_of_employees, ''),	COALESCE(name, ''),	COALESCE(position, ''),	COALESCE(department, ''),	COALESCE(building, ''),	COALESCE(hire_date, '0000-00-00'),	COALESCE(date_out, '0000-00-00'),	COALESCE(date_resignation_submissions, '0000-00-00'),	COALESCE(type, ''),	COALESCE(reason, ''),	COALESCE(detail_reason, ''),	COALESCE(periode_of_service, ''),	COALESCE(age, 0),	COALESCE(suggestion, ''),	COALESCE(status_resignsubmisssion, ''),	COALESCE(using_media, ''),	COALESCE(classification, ''),	COALESCE(created_at, '0000-00-00 00:00:00'),	COALESCE(updated_at, '0000-00-00 00:00:00')	from resignation_submissions where number_of_employees = ?", message).
+				Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification, &Submission.Created_at, &Submission.Updated_at)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("A%d", no), Submission.Number_of_employees)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("B%d", no), Submission.Name)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("C%d", no), Submission.Position)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("D%d", no), Submission.Department)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("E%d", no), Submission.Building)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("F%d", no), Submission.Hire_date)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), Submission.Date_out)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), Submission.Type)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), Submission.Reason)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Submission.Detail_reason)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Submission.Age)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Submission.Suggestion)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Submission.Status_resignsubmisssion)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("N%d", no), Submission.Using_media)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("O%d", no), Submission.Classification)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("P%d", no), Submission.Created_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("Q%d", no), Submission.Updated_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("R%d", no), Submission.Date_resignation_submissions)
+		}(&wg, NIK, no)
+	}
+
+	wg.Wait()
+
+	var b bytes.Buffer
+	writr := bufio.NewWriter(&b)
+	xlsx.Write(writr)
+	writr.Flush()
+	fileContents := b.Bytes()
+	fileSize := strconv.Itoa(len(fileContents))
+
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-disposition", "attachment;filename=Data_Pengajuan_Design.xlsx")
+	w.Header().Set("Content-Length", fileSize)
+
+	t := bytes.NewReader(b.Bytes())
+	io.Copy(w, t)
+
+	fmt.Fprintln(w, "Download Sukses")
+}
+
+func ExportResign(w http.ResponseWriter, r *http.Request) {
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	rows, err := dbhwi.Query("select number_of_employees from resigns")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer rows.Close()
+
+	xlsx := excelize.NewFile()
+	sheet1Name := "Sheet1"
+
+	xlsx.SetSheetName(xlsx.GetSheetName(1), sheet1Name)
+
+	err = xlsx.AutoFilter(sheet1Name, "A1", "Q1", "")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	xlsx.SetCellValue(sheet1Name, "A1", "NIK")
+	xlsx.SetCellValue(sheet1Name, "B1", "NAME")
+	xlsx.SetCellValue(sheet1Name, "C1", "POSISI")
+	xlsx.SetCellValue(sheet1Name, "D1", "DEPARTMENT")
+	xlsx.SetCellValue(sheet1Name, "E1", "GEDUNG")
+	xlsx.SetCellValue(sheet1Name, "F1", "HIRE DATE =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
+	xlsx.SetCellValue(sheet1Name, "G1", "DATE OUT =DATE(LEFT(G2,4), MID(G2,6,2), RIGHT(G2,2))")
+	xlsx.SetCellValue(sheet1Name, "H1", "TYPE")
+	xlsx.SetCellValue(sheet1Name, "I1", "ALASAM")
+	xlsx.SetCellValue(sheet1Name, "J1", "ALASAN TAMBAHAN")
+	xlsx.SetCellValue(sheet1Name, "K1", "UMUR")
+	xlsx.SetCellValue(sheet1Name, "L1", "SARAN")
+	xlsx.SetCellValue(sheet1Name, "M1", "STATUS RESIGN")
+	xlsx.SetCellValue(sheet1Name, "N1", "USING MEDIA")
+	xlsx.SetCellValue(sheet1Name, "O1", "CLASSIFIKASI")
+	xlsx.SetCellValue(sheet1Name, "P1", "CREATEAD AT")
+	xlsx.SetCellValue(sheet1Name, "Q1", "UPDATED AT")
+	xlsx.SetCellValue(sheet1Name, "R1", "TGL PERMOHONAN =DATE(LEFT(R2,4), MID(R2,6,2), RIGHT(R2,2))")
+
+	var wg sync.WaitGroup
+
+	no := 1
+
+	for rows.Next() {
+		var NIK string
+		var err = rows.Scan(&NIK)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		no += 1
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, message string, no int) {
+			defer wg.Done()
+			var Resign Resign
+
+			err = dbhwi.QueryRow("SELECT COALESCE(number_of_employees, ''),	COALESCE(name, ''),	COALESCE(position, ''),	COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'),	COALESCE(date_out, '0000-00-00'),	COALESCE(date_resignsubmissions, '0000-00-00'),	COALESCE(type, ''),	COALESCE(age, 0),	COALESCE(status_resign, ''),	COALESCE(classification, ''),	COALESCE(created_at, '0000-00-00 00:00:00'),	COALESCE(updated_at, '0000-00-00 00:00:00')	from resigns where number_of_employees = ?", message).
+				Scan(&Resign.Number_of_employees, &Resign.Name, &Resign.Position, &Resign.Department, &Resign.Hire_date, &Resign.Date_out, &Resign.Date_resignsubmissions, &Resign.Type, &Resign.Age, &Resign.Status_resign, &Resign.Classification, &Resign.Created_at, &Resign.Updated_at)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("A%d", no), Resign.Number_of_employees)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("B%d", no), Resign.Name)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("C%d", no), Resign.Position)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("D%d", no), Resign.Department)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("E%d", no), Resign.Hire_date)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("F%d", no), Resign.Date_out)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), Resign.Type)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), Resign.Age)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), Resign.Status_resign)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Resign.Classification)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Resign.Created_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Resign.Updated_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Date_resignsubmissions)
+		}(&wg, NIK, no)
+	}
+
+	wg.Wait()
+
+	var b bytes.Buffer
+	writr := bufio.NewWriter(&b)
+	xlsx.Write(writr)
+	writr.Flush()
+	fileContents := b.Bytes()
+	fileSize := strconv.Itoa(len(fileContents))
+
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-disposition", "attachment;filename=Data_resign.xlsx")
+	w.Header().Set("Content-Length", fileSize)
+
+	t := bytes.NewReader(b.Bytes())
+	io.Copy(w, t)
+
+	fmt.Fprintln(w, "Download Sukses")
+}
+
 func Age(DateString string) int {
 
 	var s string
@@ -2349,6 +2565,7 @@ func main() {
 
 	r.HandleFunc("/resign", Post).Methods("POST")
 	r.HandleFunc("/resignacc", PostAcc).Methods("POST")
+	r.HandleFunc("/ExportSubmission", ExportSubmission).Methods("GET")
 
 	//Resigns
 	r.HandleFunc("/resigns", GetResigns).Methods("GET")
@@ -2357,6 +2574,7 @@ func main() {
 	r.HandleFunc("/resigns_update", GetUpdateResign).Methods("POST")
 	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
 	r.HandleFunc("/resigns/makeexperience", PostExperience).Methods("POST")
+	r.HandleFunc("/ExportResign", ExportResign).Methods("GET")
 
 	//Parklaring
 	r.HandleFunc("/parklarings_certificate", GetParklaringCertificates).Methods("GET")
