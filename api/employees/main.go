@@ -221,7 +221,6 @@ func ConnHwi() (*sql.DB, error) {
 var datas []Employee
 
 /*
-
 	func Index(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
@@ -263,11 +262,64 @@ var datas []Employee
 
 */
 
+func Dashboard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var dbhwi, err = ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	var Count_Submission, Count_Resign, Count_Certificate, Count_Experience, Count_Kuesioner int
+
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id from resignation_submissions").Scan(&Count_Submission)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id from kuesioners").Scan(&Count_Kuesioner)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id from resigns").Scan(&Count_Resign)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id from certificate_of_employments").Scan(&Count_Certificate)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id from work_experience_letters").Scan(&Count_Experience)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	data := map[string]int{
+		"submission":         Count_Submission,
+		"kuesioner":          Count_Kuesioner,
+		"resign":             Count_Resign,
+		"letter_certificate": Count_Certificate,
+		"letter_experience":  Count_Experience,
+	}
+
+	result := map[string]interface{}{
+		"data":    data,
+		"code":    200,
+		"message": "Successfully",
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+
 func Index(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
-
-	fmt.Println(StringMonth())
 
 	result := map[string]string{
 		"data": "Connection Succesfully",
@@ -278,6 +330,99 @@ func Index(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.Write([]byte(resp))
+}
+
+func EmployeeAction(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	db, err := Conn()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	var message string
+
+	if r.Method == "POST" {
+
+		var data Employee
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		if data.Status_employee == "active" {
+			//Menghapus data resign
+
+			_, err = dbhwi.Exec("DELETE FROM resigns WHERE number_of_employees = ?", data.Number_of_employees)
+
+			_, err = dbhwi.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees)
+
+			_, err = dbhwi.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees)
+
+			message = fmt.Sprintf("Data resign %s berhasil di hapus", data.Number_of_employees)
+
+		} else if data.Status_employee == "notactive" {
+			//menambah data resign
+
+			var Count_id int
+			var Employee Employee
+
+			err = db.QueryRow("SELECT COUNT(id) as id , COALESCE(status_employee, '') as status_employee, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'),COALESCE(job_id, 25),COALESCE(department_id, 116), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = ? ", data.Number_of_employees).
+				Scan(&Count_id, &Employee.Status_employee, &Employee.Name, &Employee.Hire_date, &Employee.Date_of_birth, &Employee.Date_out, &Employee.Job_id, &Employee.Department_id, &Employee.Address_jalan, &Employee.Address_rt, &Employee.Address_rw, &Employee.Address_village, &Employee.Address_district, &Employee.Address_city, &Employee.Address_province)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			switch Count_id {
+			case 1:
+				var Count_resign int
+				queryrow_resign := fmt.Sprintf("SELECT COUNT(id) as id FROM resigns WHERE number_of_employees = %s", data.Number_of_employees)
+				err = dbhwi.QueryRow(queryrow_resign).Scan(&Count_resign)
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+				if Count_resign == 0 {
+					_, err = dbhwi.Exec("INSERT INTO resigns (`number_of_employees`, `name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`,  `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", data.Number_of_employees, Employee.Name, JobDepartment(data.Number_of_employees)[0], JobDepartment(data.Number_of_employees)[1], Employee.Hire_date, CekDateSubmission(data.Number_of_employees), data.Date_out, nil, Periode_of_serve(Employee.Hire_date, data.Date_out), TypeResign(data.Number_of_employees, data.Date_out)["type"], Age(Employee.Date_of_birth), TypeResign(data.Number_of_employees, data.Date_out)["status"], DMYhms(), DMYhms())
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				} else if Count_resign > 0 {
+					_, err = dbhwi.Exec("UPDATE resigns SET number_of_employees = ? , name = ?, position = ?, department = ?, hire_date = ?, classification = ?, date_out = ?, date_resignsubmissions = ?, periode_of_service = ?, type = ?, age = ?, status_resign = ?, created_at = ?, updated_at = ? WHERE number_of_employees = ?", data.Number_of_employees, Employee.Name, JobDepartment(data.Number_of_employees)[0], JobDepartment(data.Number_of_employees)[1], Employee.Hire_date, CekDateSubmission(data.Number_of_employees), data.Date_out, nil, Periode_of_serve(Employee.Hire_date, data.Date_out), TypeResign(data.Number_of_employees, data.Date_out)["type"], Age(Employee.Date_of_birth), TypeResign(data.Number_of_employees, data.Date_out)["status"], DMYhms(), DMYhms(), data.Number_of_employees)
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				}
+				message = fmt.Sprintf("Data %s Berhasil di resign kan", data.Number_of_employees)
+				break
+			}
+		}
+
+		result := map[string]interface{}{
+			"code":    200,
+			"message": message,
+		}
+
+		resp, err := json.Marshal(result)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		w.Write([]byte(resp))
+		return
+	}
+
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {
@@ -878,8 +1023,7 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 	for _, record := range records {
 
 		var Count_employees int
-		var Number_of_employees string
-		var Status_employee string
+		var Status_employee, Number_of_employees string
 
 		err = db.
 			QueryRow("select COUNT(id), COALESCE(number_of_employees, 'NULL'), COALESCE(status_employee, 'NULL') FROM employees where number_of_employees = ? ", record[1]).
@@ -922,12 +1066,6 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// const day, month, year = 2, 1, 1999
-			// date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-			// dateAge := age.Calculate(date)
-
-			// fmt.Println(dateAge)
-
 			// ===================== RESULT
 
 			if Count_resigns > 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
@@ -951,7 +1089,7 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 			} else if Count_resigns == 1 && Count_resign_submissions == 0 {
 				//Sudah resign tapi belum mengajukan resign maka boleh mengajukan
 
-				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], "false", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
+				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `address`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], record[3], resultemployee.Hire_date, resultemployee.Date_out, record[4], "false", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
 				if err != nil {
 					fmt.Println(err.Error())
 					return
@@ -967,7 +1105,7 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 			} else if Count_resigns == 0 && Count_resign_submissions == 0 {
 				// TIdak resign dan belum mengajukan resign maka boleh mengajukan resign
 
-				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], resultemployee.Hire_date, resultemployee.Date_out, record[4], "true", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
+				_, err = dbhwi.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `address`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], record[3], resultemployee.Hire_date, resultemployee.Date_out, record[4], "true", record[3], record[6], Periode_of_serve(resultemployee.Hire_date, record[4]), Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
 				if err != nil {
 					fmt.Println(err.Error())
 					return
@@ -1222,18 +1360,15 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func PostAcc(w http.ResponseWriter, r *http.Request) {
-
 	//untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
 
-	// data := r.Body
 	//mendecode requset body langsung menjadi json
 	data := ResignAcc{}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	fmt.Println(data)
 
 	db, err := Conn()
 	if err != nil {
@@ -1245,14 +1380,12 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 	var dbhwi, _ = ConnHwi()
 	defer dbhwi.Close()
 
-	//acc submission
 	// Update data resign status acc
-	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ", data.Status_resign, data.Number_of_employees)
+	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ORDER BY id DESC", data.Status_resign, data.Number_of_employees)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	fmt.Println("Acc Resign !")
 
 	var status_employee string
 	if data.Status_resign == "acc" {
@@ -1261,72 +1394,62 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 		status_employee = "active"
 	}
 
-	//edit employees
-	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, data.Number_of_employees)
+	// edit employees
+	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ?  ORDER BY id DESC", status_employee, data.Number_of_employees)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	fmt.Println("Acc Submission !")
 
-	//select resign submissions
-
+	// select resign submissions
 	var Submission = ResignSubmission{}
-
-	err = dbhwi.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out,	date_resignation_submissions,	type,	reason,	detail_reason,	periode_of_service,	age,	suggestion,	status_resignsubmisssion,	using_media,	classification FROM resignation_submissions WHERE number_of_employees = ?", data.Number_of_employees).
-		Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Suggestion, &Submission.Periode_of_service, &Submission.Age, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
+	err = dbhwi.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'),	type, reason, detail_reason, periode_of_service, age, suggestion,	status_resignsubmisssion,	using_media, classification FROM resignation_submissions WHERE number_of_employees = ?", data.Number_of_employees).
+		Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	//insert data resigns
-	_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", &Submission.Number_of_employees, &Submission.Name, &Submission.Hire_date, &Submission.Classification, &Submission.Date_resignation_submissions, &Submission.Date_resignation_submissions, &Submission.Periode_of_service, &Submission.Type, &Submission.Age, &Submission.Status_resignsubmisssion, 0, DMYhms(), DMYhms())
+	_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, Submission.Classification, Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, Submission.Status_resignsubmisssion, 0, DMYhms(), DMYhms())
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	fmt.Println("Insert Data Resign !")
-
-	var resign_id int
-
-	err = dbhwi.QueryRow("SELECT id FROM resigns WHERE created_at = ?", DMYhms()).
-		Scan(&resign_id)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	// insert data certificat atau description work
-	if Submission.Type == "true" && Submission.Periode_of_service > 365 && data.Status_resign == "acc" {
-
-		_, err = dbhwi.Exec("INSERT INTO `certificate_of_employments`(`resign_id`, `date_certificate_employee`, `no_certificate_employee`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, DMY(), 1, DMYhms(), DMYhms())
+	fmt.Println("Insert")
+	/*
+		var resign_id int
+		err = dbhwi.QueryRow("SELECT id FROM resigns WHERE created_at = ?", DMYhms()).
+			Scan(&resign_id)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-		fmt.Println("Insert Data Certificate !")
 
-	} else if Submission.Type == "false" && data.Status_resign == "acc" {
-
-		_, err = dbhwi.Exec("INSERT INTO `work_experience_letters`(`resign_id`, `date_letter_exprerience`, `no_letter_experience`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, DMY(), 1, DMYhms(), DMYhms())
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+		// insert data certificat atau description work
+		if Submission.Type == "true" && Submission.Periode_of_service > 365 && data.Status_resign == "acc" {
+			_, err = dbhwi.Exec("INSERT INTO `certificate_of_employments`(`resign_id`, `number_of_employees`, `date_certificate_employee`, `no_certificate_employee`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, data.Number_of_employees, DMY(), 1, DMYhms(), DMYhms())
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+		} else if Submission.Type == "false" && data.Status_resign == "acc" {
+			_, err = dbhwi.Exec("INSERT INTO `work_experience_letters`(`resign_id`, `number_of_employees`, `date_letter_exprerience`, `no_letter_experience`, `created_at`, `updated_at`) VALUES (?,?,?,?,?)", resign_id, data.Number_of_employees, DMY(), 1, DMYhms(), DMYhms())
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		}
-		fmt.Println("Insert Data Experience !")
 
-	}
+	*/
 
 	response := map[string]interface{}{
 		"status_resign": data.Status_resign,
 		"status_code":   200,
 	}
-
 	resp, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
 
 }
@@ -1547,7 +1670,7 @@ func GetUpdateResign(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dbhwi.Close()
 
-	_, err = dbhwi.Exec("UPDATE `resigns` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignsubmissions`= ? ,`type`= ? , `periode_of_service`= ? ,`age`= ? ,`status_resign`= ? , `classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignsubmissions, data.Type, Periode_of_serve(data.Hire_date, data.Date_resignsubmissions), data.Age, data.Status_resign, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
+	_, err = dbhwi.Exec("UPDATE `resigns` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignsubmissions`= ? ,`type`= ? , `periode_of_service`= ? ,`age`= ? ,`status_resign`= ? , `classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignsubmissions, data.Type, Periode_of_serve(data.Hire_date, data.Date_out), data.Age, data.Status_resign, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
 	if err != nil {
 		fmt.Println(err.Error())
 		result := map[string]interface{}{
@@ -1603,7 +1726,7 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 
 	var CountCertifcateNumberOf_employees int
 
-	err = db.QueryRow("SELECT COUNT(*) FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees).
+	err = db.QueryRow("SELECT COUNT(*) FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&CountCertifcateNumberOf_employees)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -1626,10 +1749,8 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var certifictaeofemploment = Letter{}
-
 	err = db.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
-
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -1776,13 +1897,11 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadedFile, _, err := r.FormFile("file")
-
 	if err != nil {
 		log.Fatal("ERROR", err.Error())
 	}
 
 	reader := csv.NewReader(uploadedFile)
-
 	records, _ := reader.ReadAll()
 
 	var notification []string
@@ -1791,18 +1910,12 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 	var Employee = Employee{}
 	var Count_id int
 	for _, record := range records {
-
 		err = db.QueryRow("SELECT COUNT(id) as id , COALESCE(status_employee, '') as status_employee, COALESCE(name, ''), COALESCE(hire_date, ''), COALESCE(date_of_birth, ''), COALESCE(date_out, '0000-00-00'),COALESCE(job_id, 25),COALESCE(department_id, 116), COALESCE(address_jalan, ''), COALESCE(address_rt, ''), COALESCE(address_rw, ''), COALESCE(address_village, ''), COALESCE(address_district, ''), COALESCE(address_city, ''), COALESCE(address_province, '') FROM employees WHERE number_of_employees = ? ", record[0]).
 			Scan(&Count_id, &Employee.Status_employee, &Employee.Name, &Employee.Hire_date, &Employee.Date_of_birth, &Employee.Date_out, &Employee.Job_id, &Employee.Department_id, &Employee.Address_jalan, &Employee.Address_rt, &Employee.Address_rw, &Employee.Address_village, &Employee.Address_district, &Employee.Address_city, &Employee.Address_province)
-
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-
-		// fmt.Println("Ini Count_id ", Count_id, Employee.Status_employee, Employee.Name, Employee.Hire_date, Employee.Date_of_birth, Employee.Date_out, Employee.Address_jalan, Employee.Address_rt, Employee.Address_rw, Employee.Address_village, Employee.Address_district, Employee.Address_city, Employee.Address_province)
 		if Count_id > 0 {
-			// 	fmt.Println("Status ini => ", Employee.Status_employee)
-
 			switch Employee.Status_employee {
 			case "active":
 				_, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
@@ -1818,26 +1931,6 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 			default:
 				fmt.Println("Tidak Melakukan Transaksi update data karyawan")
 			}
-
-			/*
-				if Employee.Status_employee == "active" {
-					queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", record[2], "notactive", record[3], record[0])
-					_, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
-					if err != nil {
-						fmt.Println(err.Error())
-					}
-					fmt.Println("UPDATE SUKSES")
-					fmt.Println(queryupdate)
-				} else if Employee.Status_employee == "notactive" {
-					fmt.Println("Status ini notactive => aslinya ", Employee.Status_employee)
-					queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", "0000-00-00", "active", record[3], record[0])
-					_, err = db.Exec(queryupdate)
-					if err != nil {
-						fmt.Println(err.Error())
-					}
-					fmt.Println(queryupdate)
-				}
-			*/
 		}
 
 		var Count_idresigns = 0
@@ -1846,20 +1939,9 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-
 		if record[0] == "number_of_employees" {
-
 		} else if Count_idresigns < 1 && Count_id > 0 {
-			var Job_level, Department string
-			err = db.QueryRow("SELECT job_level FROM jobs WHERE id = ?", Employee.Job_id).Scan(&Job_level)
-			if err != nil {
-				fmt.Println(err.Error())
-			}
-			err = db.QueryRow("SELECT department FROM departments WHERE id = ?", Employee.Department_id).Scan(&Department)
-			if err != nil {
-				fmt.Println(err.Error())
-			}
-			_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, Job_level, Department, Employee.Hire_date, CekDateSubmission(record[0]), record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), "false", Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
+			_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, JobDepartment(record[0])[0], JobDepartment(record[0])[1], Employee.Hire_date, CekDateSubmission(record[0]), record[2], nil, Periode_of_serve(Employee.Hire_date, record[2]), TypeResign(record[0], record[2])["type"], Age(Employee.Date_of_birth), "resign", 0, DMYhms(), DMYhms())
 			if err != nil {
 				fmt.Println(err.Error())
 				return
@@ -1870,23 +1952,18 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 			notification = append(notification, each)
 		}
 	}
-
 	//untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
-
 	result := map[string]interface{}{
 		"code":    code,
 		"data":    notification,
 		"message": "Succesfully",
 	}
-
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
-
 }
 
 func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
@@ -1906,19 +1983,16 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 		var datanull = []map[string]string{
 			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_certificate_employee": "NULL", "no_certificate_employee": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
 		}
-
 		result := map[string]interface{}{
 			"code":  404,
 			"meta":  "NULL",
 			"data":  datanull,
 			"links": "NULL",
 		}
-
 		resp, err := json.Marshal(result)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-
 		w.Write([]byte(resp))
 		return
 	}
@@ -1945,16 +2019,14 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 	db.QueryRow(sqlCount).Scan(&total)
 	if total == 0 {
 		var datanull = []map[string]string{
-			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_certificate_employee": "NULL", "no_certificate_employee": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_letter": "NULL", "no_letter": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
 		}
-
 		result := map[string]interface{}{
 			"code":  404,
 			"meta":  "NULL",
 			"data":  datanull,
 			"links": "NULL",
 		}
-
 		resp, err := json.Marshal(result)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1998,7 +2070,6 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 
 	perPage, _ := strconv.Atoi("10")
 	sqlPaging = fmt.Sprintf("%s LIMIT %d OFFSET %d", sqlPaging, perPage, (page-1)*perPage)
-
 	rows, err := db.Query(sqlPaging)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -2010,7 +2081,8 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var each = Letter{}
-		var err = rows.Scan(&each.Id, &each.Resign_id, &each.Number_of_employees, &each.Date, &each.No, &each.Rom, &each.Created_at, &each.Updated_at)
+		var err = rows.
+			Scan(&each.Id, &each.Resign_id, &each.Number_of_employees, &each.Date, &each.No, &each.Rom, &each.Created_at, &each.Updated_at)
 
 		if err != nil {
 			fmt.Println(err.Error())
@@ -2018,7 +2090,7 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var Resign Resign
-		err = db.QueryRow("SELECT name, hire_date, date_out, position, department FROM resigns WHERE id = ? ", each.Resign_id).
+		err = db.QueryRow("SELECT COALESCE(name, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(position, ''), COALESCE(department, '') FROM resigns WHERE id = ? ", each.Resign_id).
 			Scan(&Resign.Name, &Resign.Hire_date, &Resign.Date_out, &Resign.Position, &Resign.Department)
 
 		if err != nil {
@@ -2026,7 +2098,7 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var data = map[string]interface{}{"id": each.Id, "number_of_employees": each.Number_of_employees, "name": Resign.Name, "hire_date": Resign.Hire_date, "date_out": Resign.Date_out, "position": Resign.Position, "department": Resign.Department, "date_certificate_employee": each.Date, "no": each.No, "rom": each.Rom, "created_at": each.Created_at, "update_at": each.Updated_at}
+		var data = map[string]interface{}{"id": each.Id, "number_of_employees": each.Number_of_employees, "name": Resign.Name, "hire_date": Resign.Hire_date, "date_out": Resign.Date_out, "position": Resign.Position, "department": Resign.Department, "date_letter": each.Date, "no_letter": each.No, "rom": each.Rom, "created_at": each.Created_at, "update_at": each.Updated_at}
 
 		letter = append(letter, data)
 	}
@@ -2102,18 +2174,18 @@ func GetEditParklaringCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"id":                        letter.Id,
-		"name":                      resign.Name,
-		"number_of_employees":       letter.Number_of_employees,
-		"hire_date":                 resign.Hire_date,
-		"date_out":                  resign.Date_out,
-		"position":                  resign.Position,
-		"department":                resign.Department,
-		"date_certificate_employee": letter.Date,
-		"no_certificate_employee":   letter.No,
-		"rom":                       letter.Rom,
-		"created_at":                letter.Created_at,
-		"updated_at":                letter.Updated_at,
+		"id":                  letter.Id,
+		"name":                resign.Name,
+		"number_of_employees": letter.Number_of_employees,
+		"hire_date":           resign.Hire_date,
+		"date_out":            resign.Date_out,
+		"position":            resign.Position,
+		"department":          resign.Department,
+		"date_letter":         letter.Date,
+		"no_letter":           letter.No,
+		"rom":                 letter.Rom,
+		"created_at":          letter.Created_at,
+		"updated_at":          letter.Updated_at,
 	}
 
 	result := map[string]interface{}{
@@ -2146,6 +2218,280 @@ func GetUpdateParklaringCertificate(w http.ResponseWriter, r *http.Request) {
 	defer dbhwi.Close()
 
 	_, err = dbhwi.Exec("UPDATE `certificate_of_employments` SET `date_certificate_employee`= ? ,`no_certificate_employee`= ? ,`rom`=  ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Date, data.No, data.Rom, data.Created_at, data.Updated_at, data.Number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		result := map[string]interface{}{
+			"code":    400,
+			"message": "Update Loss",
+		}
+		resp, _ := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		w.Write([]byte(resp))
+		return
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    data,
+		"message": "Update Success",
+	}
+
+	resp, _ := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Write([]byte(resp))
+}
+
+func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	db, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	var count_work_experience_letters int
+
+	err = db.QueryRow("SELECT COUNT(id) as count_work_experience_letters FROM work_experience_letters ").
+		Scan(&count_work_experience_letters)
+	if count_work_experience_letters == 0 {
+		var datanull = []map[string]string{
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_letter": "NULL", "no_letter": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+		}
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
+		}
+		resp, err := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		w.Write([]byte(resp))
+		return
+	}
+
+	u, err := url.Parse(r.RequestURI)
+	if err != nil {
+		log.Fatal(err)
+	}
+	q := u.Query()
+
+	var sqlPaging string = "SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_exprerience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters"
+	var sqlCount string = "SELECT COUNT(*) FROM certificate_of_employments"
+	var params string = ""
+
+	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
+	if checkNumber_of_employees != false {
+		justStringnumber_of_employees := strings.Join(number_of_employees, "")
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlPaging, justStringnumber_of_employees)
+		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
+		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
+	}
+
+	var total int64
+	db.QueryRow(sqlCount).Scan(&total)
+	if total == 0 {
+		var datanull = []map[string]string{
+			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "position": "NULL", "department": "NULL", "date_letter": "NULL", "no_letter": "NULL", "rom": "NULL", "created_at": "NULL", "updated_at": "NULL"},
+		}
+		result := map[string]interface{}{
+			"code":  404,
+			"meta":  "NULL",
+			"data":  datanull,
+			"links": "NULL",
+		}
+		resp, err := json.Marshal(result)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		w.Write([]byte(resp))
+		return
+	}
+
+	var totalminbyperpage, lastPage int64
+	totalminbyperpage = total - ((total / 10) * 10)
+
+	if totalminbyperpage == 0 {
+		lastPage = (total / 10)
+	} else {
+		lastPage = ((total / 10) + 1)
+	}
+
+	page, _ := strconv.Atoi("1")
+	cpage, checkPage := q["page"]
+	if checkPage != false {
+		spage, _ := strconv.Atoi(strings.Join(cpage, ""))
+		page = spage
+	}
+
+	var first, last, next, prev string
+	first, last, next, prev = "", "", "", ""
+
+	first = "1"
+	last = strconv.Itoa(int(lastPage))
+
+	next = strconv.Itoa(int(page + 1))
+	if int(page+1) >= int(lastPage) {
+		next = strconv.Itoa(int(lastPage))
+	}
+
+	prev = strconv.Itoa(int(page - 1))
+	if int(page) == 1 {
+		prev = strconv.Itoa(int(page))
+	}
+
+	perPage, _ := strconv.Atoi("10")
+	sqlPaging = fmt.Sprintf("%s LIMIT %d OFFSET %d", sqlPaging, perPage, (page-1)*perPage)
+	rows, err := db.Query(sqlPaging)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer rows.Close()
+
+	var letter []map[string]interface{}
+
+	for rows.Next() {
+		var each = Letter{}
+		var err = rows.
+			Scan(&each.Id, &each.Resign_id, &each.Number_of_employees, &each.Date, &each.No, &each.Rom, &each.Created_at, &each.Updated_at)
+
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		var Resign Resign
+		err = db.QueryRow("SELECT COALESCE(name, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(position, ''), COALESCE(department, '') FROM resigns WHERE id = ? ", each.Resign_id).
+			Scan(&Resign.Name, &Resign.Hire_date, &Resign.Date_out, &Resign.Position, &Resign.Department)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		var data = map[string]interface{}{"id": each.Id, "number_of_employees": each.Number_of_employees, "name": Resign.Name, "hire_date": Resign.Hire_date, "date_out": Resign.Date_out, "position": Resign.Position, "department": Resign.Department, "date_letter": each.Date, "no_letter": each.No, "rom": each.Rom, "created_at": each.Created_at, "update_at": each.Updated_at}
+		letter = append(letter, data)
+	}
+
+	links := map[string]interface{}{
+		"first": fmt.Sprintf("page=%s%s", first, params),
+		"last":  fmt.Sprintf("page=%s%s", last, params),
+		"next":  fmt.Sprintf("page=%s%s", next, params),
+		"prev":  fmt.Sprintf("page=%s%s", prev, params),
+	}
+
+	informationpages := map[string]interface{}{
+		"currentPage": page,
+		"from":        ((page - 1) * 10) + 1,
+		"lastPage":    lastPage,
+		"perPage":     10,
+		"to":          ((page - 1) * 10) + len(letter),
+		"total":       total,
+	}
+
+	pages := map[string]interface{}{
+		"page": informationpages,
+	}
+
+	result := map[string]interface{}{
+		"code":  200,
+		"meta":  pages,
+		"data":  letter,
+		"links": links,
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	w.Write([]byte(resp))
+
+}
+
+func GetEditParklaringExperience(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+
+	Number_of_employess, _ := strconv.Atoi(vars["number_of_employees"])
+
+	var dbhwi, err = ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	var letter Letter
+
+	err = dbhwi.QueryRow("SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_exprerience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters WHERE number_of_employees = ? ", Number_of_employess).
+		Scan(&letter.Id, &letter.Resign_id, &letter.Number_of_employees, &letter.Date, &letter.No, &letter.Rom, &letter.Created_at, &letter.Updated_at)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	var resign Resign
+
+	err = dbhwi.QueryRow("SELECT COALESCE(name, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(position, ''), COALESCE(department, '') FROM resigns WHERE id = ? ", letter.Resign_id).
+		Scan(&resign.Name, &resign.Hire_date, &resign.Date_out, &resign.Position, &resign.Department)
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	data := map[string]interface{}{
+		"id":                  letter.Id,
+		"name":                resign.Name,
+		"number_of_employees": letter.Number_of_employees,
+		"hire_date":           resign.Hire_date,
+		"date_out":            resign.Date_out,
+		"position":            resign.Position,
+		"department":          resign.Department,
+		"date_letter":         letter.Date,
+		"no_letter":           letter.No,
+		"rom":                 letter.Rom,
+		"created_at":          letter.Created_at,
+		"updated_at":          letter.Updated_at,
+	}
+
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    data,
+		"message": "Successfully",
+	}
+
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.Write([]byte(resp))
+
+}
+
+func GetUpdateParklaringExperience(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "application/json")
+
+	data := Letter{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	_, err = dbhwi.Exec("UPDATE `work_experience_letters` SET `date_letter_exprerience`= ? ,`no_letter_experience`= ? ,`rom`=  ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Date, data.No, data.Rom, data.Created_at, data.Updated_at, data.Number_of_employees)
 	if err != nil {
 		fmt.Println(err.Error())
 		result := map[string]interface{}{
@@ -2309,20 +2655,15 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 	xlsx.SetCellValue(sheet1Name, "B1", "NAME")
 	xlsx.SetCellValue(sheet1Name, "C1", "POSISI")
 	xlsx.SetCellValue(sheet1Name, "D1", "DEPARTMENT")
-	xlsx.SetCellValue(sheet1Name, "E1", "GEDUNG")
-	xlsx.SetCellValue(sheet1Name, "F1", "HIRE DATE =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
-	xlsx.SetCellValue(sheet1Name, "G1", "DATE OUT =DATE(LEFT(G2,4), MID(G2,6,2), RIGHT(G2,2))")
+	xlsx.SetCellValue(sheet1Name, "E1", "HIRE DATE =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
+	xlsx.SetCellValue(sheet1Name, "F1", "DATE OUT =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
+	xlsx.SetCellValue(sheet1Name, "G1", "TGL PERMOHONAN =DATE(LEFT(G2,4), MID(G2,6,2), RIGHT(G2,2))")
 	xlsx.SetCellValue(sheet1Name, "H1", "TYPE")
-	xlsx.SetCellValue(sheet1Name, "I1", "ALASAM")
-	xlsx.SetCellValue(sheet1Name, "J1", "ALASAN TAMBAHAN")
-	xlsx.SetCellValue(sheet1Name, "K1", "UMUR")
-	xlsx.SetCellValue(sheet1Name, "L1", "SARAN")
-	xlsx.SetCellValue(sheet1Name, "M1", "STATUS RESIGN")
-	xlsx.SetCellValue(sheet1Name, "N1", "USING MEDIA")
-	xlsx.SetCellValue(sheet1Name, "O1", "CLASSIFIKASI")
-	xlsx.SetCellValue(sheet1Name, "P1", "CREATEAD AT")
-	xlsx.SetCellValue(sheet1Name, "Q1", "UPDATED AT")
-	xlsx.SetCellValue(sheet1Name, "R1", "TGL PERMOHONAN =DATE(LEFT(R2,4), MID(R2,6,2), RIGHT(R2,2))")
+	xlsx.SetCellValue(sheet1Name, "I1", "UMUR")
+	xlsx.SetCellValue(sheet1Name, "J1", "STATUS RESIGN")
+	xlsx.SetCellValue(sheet1Name, "K1", "CLASSIFIKASI")
+	xlsx.SetCellValue(sheet1Name, "L1", "CREATEAD AT")
+	xlsx.SetCellValue(sheet1Name, "M1", "UPDATED AT")
 
 	var wg sync.WaitGroup
 
@@ -2354,13 +2695,13 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("D%d", no), Resign.Department)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("E%d", no), Resign.Hire_date)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("F%d", no), Resign.Date_out)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), Resign.Type)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), Resign.Age)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), Resign.Status_resign)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Resign.Classification)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Resign.Created_at)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Resign.Updated_at)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Date_resignsubmissions)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), Resign.Date_resignsubmissions)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), Resign.Type)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), Resign.Age)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Resign.Status_resign)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Resign.Classification)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Resign.Created_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Updated_at)
 		}(&wg, NIK, no)
 	}
 
@@ -2383,8 +2724,135 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Download Sukses")
 }
 
-func Age(DateString string) int {
+func ExportLetter(w http.ResponseWriter, r *http.Request) {
 
+	vars := mux.Vars(r)
+
+	dataletter, _ := vars["dataletter"]
+
+	dbhwi, err := ConnHwi()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbhwi.Close()
+
+	var table, letter_Date, letter_No string
+
+	if dataletter == "certificate_of_employments" {
+		table = "certificate_of_employments"
+		letter_Date = "date_certificate_employee"
+		letter_No = "no_certificate_employee"
+	} else {
+		table = "work_experience_letters"
+		letter_Date = "date_letter_exprerience"
+		letter_No = "no_letter_experience"
+	}
+
+	query := fmt.Sprintf("select resign_id, COALESCE(%s, '0000-00-00'), COALESCE(%s, 0), COALESCE(rom, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00') from %s", letter_Date, letter_No, table)
+
+	// rows, err := dbhwi.Query("select resign_id, COALESCE(?, '0000-00-00'), COALESCE(?, 0), COALESCE(rom, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00') from ?", letter_Date, letter_No, dataletter)
+	rows, err := dbhwi.Query(query)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer rows.Close()
+
+	xlsx := excelize.NewFile()
+	sheet1Name := "Sheet1"
+
+	xlsx.SetSheetName(xlsx.GetSheetName(1), sheet1Name)
+
+	err = xlsx.AutoFilter(sheet1Name, "A1", "Q1", "")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	xlsx.SetCellValue(sheet1Name, "A1", "NIK")
+	xlsx.SetCellValue(sheet1Name, "B1", "NAME")
+	xlsx.SetCellValue(sheet1Name, "C1", "POSISI")
+	xlsx.SetCellValue(sheet1Name, "D1", "DEPARTMENT")
+	xlsx.SetCellValue(sheet1Name, "E1", "HIRE DATE =DATE(LEFT(E2,4), MID(E2,6,2), RIGHT(E2,2))")
+	xlsx.SetCellValue(sheet1Name, "F1", "DATE OUT =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
+	xlsx.SetCellValue(sheet1Name, "G1", "TYPE")
+	xlsx.SetCellValue(sheet1Name, "H1", "NOMOR SURAT")
+	xlsx.SetCellValue(sheet1Name, "I1", "STATUS SURAT")
+	xlsx.SetCellValue(sheet1Name, "J1", "CLASSIFIKASI")
+	xlsx.SetCellValue(sheet1Name, "K1", "UMUR")
+	xlsx.SetCellValue(sheet1Name, "L1", "CREATEAD AT")
+	xlsx.SetCellValue(sheet1Name, "M1", "UPDATED AT")
+
+	var wg sync.WaitGroup
+
+	no := 1
+	for rows.Next() {
+		var letter Letter
+		var err = rows.Scan(&letter.Resign_id, &letter.Date, &letter.No, &letter.Rom, &letter.Created_at, &letter.Updated_at)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		no = (no + 1)
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, no int, Resign_id int, Date string, No string, Rom string, Created_at string, Updated_at string) {
+			defer wg.Done()
+			var Resign Resign
+
+			err = dbhwi.QueryRow("SELECT COALESCE(number_of_employees, ''),	COALESCE(name, ''),	COALESCE(position, ''),	COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'),	COALESCE(date_out, '0000-00-00'),	COALESCE(date_resignsubmissions, '0000-00-00'),	COALESCE(type, ''),	COALESCE(age, 0),	COALESCE(status_resign, ''),	COALESCE(classification, ''),	COALESCE(created_at, '0000-00-00 00:00:00'),	COALESCE(updated_at, '0000-00-00 00:00:00')	from resigns where id = ?", Resign_id).
+				Scan(&Resign.Number_of_employees, &Resign.Name, &Resign.Position, &Resign.Department, &Resign.Hire_date, &Resign.Date_out, &Resign.Date_resignsubmissions, &Resign.Type, &Resign.Age, &Resign.Status_resign, &Resign.Classification, &Resign.Created_at, &Resign.Updated_at)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("A%d", no), Resign.Number_of_employees)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("B%d", no), Resign.Name)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("C%d", no), Resign.Position)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("D%d", no), Resign.Department)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("E%d", no), Resign.Hire_date)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("F%d", no), Resign.Date_out)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), Resign.Type)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), NomorLetter(No, "/SKK_HR/HWI/", Rom, Date))
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), Resign.Status_resign)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Resign.Classification)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Age)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Resign.Created_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Resign.Updated_at)
+
+		}(&wg, no, letter.Resign_id, letter.Date, letter.No, letter.Rom, letter.Created_at, letter.Updated_at)
+	}
+
+	wg.Wait()
+
+	var b bytes.Buffer
+	writr := bufio.NewWriter(&b)
+	xlsx.Write(writr)
+	writr.Flush()
+	fileContents := b.Bytes()
+	fileSize := strconv.Itoa(len(fileContents))
+
+	attachment := fmt.Sprintf("attachment;filename=%s.xlsx", table)
+
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-disposition", attachment)
+	w.Header().Set("Content-Length", fileSize)
+
+	t := bytes.NewReader(b.Bytes())
+	io.Copy(w, t)
+
+	fmt.Fprintln(w, "Download Sukses")
+}
+
+func NomorLetter(No string, SK string, Rom string, DateString string) string {
+	var s string
+	s = DateString
+	yearDate, _ := strconv.Atoi(string(s[0:4]))
+	output := fmt.Sprintf("%s%s%s/%d", No, SK, Rom, yearDate)
+	return output
+}
+
+func Age(DateString string) int {
 	var s string
 	s = DateString
 	yearDate, _ := strconv.Atoi(string(s[0:4]))
@@ -2400,7 +2868,6 @@ func Age(DateString string) int {
 }
 
 func Periode_of_serve(DateString string, DateString2 string) int {
-
 	var s string
 	s = DateString
 	yearDate, _ := strconv.Atoi(string(s[0:4]))
@@ -2408,7 +2875,6 @@ func Periode_of_serve(DateString string, DateString2 string) int {
 	dayDate, _ := strconv.Atoi(string(s[8:10]))
 
 	var s2 string
-	// s2 = strings.Join(DateString2, "")
 	s2 = DateString2
 	yearDate2, _ := strconv.Atoi(string(s2[0:4]))
 	monthDate2, _ := strconv.Atoi(string(s2[5:7]))
@@ -2426,6 +2892,7 @@ func CekDateSubmission(Number_of_employees string) string {
 
 	var Count_id int
 	var Submission ResignSubmission
+	var output string
 
 	err = dbhwi.QueryRow("SELECT COUNT(id) as id, COALESCE(date_resignation_submissions, '0000-00-00') FROM resignation_submissions WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait'  ", Number_of_employees).
 		Scan(&Count_id, &Submission.Date_resignation_submissions)
@@ -2433,7 +2900,6 @@ func CekDateSubmission(Number_of_employees string) string {
 		fmt.Println(err.Error())
 	}
 
-	var output string
 	switch Count_id {
 	case 1:
 		var s string
@@ -2465,6 +2931,68 @@ func CekDateSubmission(Number_of_employees string) string {
 		output = "Resign dahulu sebelum mengajukan resign"
 	}
 
+	return output
+}
+
+func JobDepartment(number_of_employees string) []string {
+
+	var db, err = Conn()
+	defer db.Close()
+
+	Employee := Employee{}
+	err = db.QueryRow("SELECT job_id, department_id FROM employees WHERE number_of_employees = ?", number_of_employees).
+		Scan(&Employee.Job_id, &Employee.Department_id)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	var Job_level, Department string
+	err = db.QueryRow("SELECT job_level FROM jobs WHERE id = ?", Employee.Job_id).Scan(&Job_level)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = db.QueryRow("SELECT department FROM departments WHERE id = ?", Employee.Department_id).Scan(&Department)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	var output = []string{Job_level, Department}
+	return output
+}
+
+func TypeResign(Number_of_employees string, Date_out string) map[string]interface{} {
+	var db, _ = Conn()
+	defer db.Close()
+
+	var dbhwi, err = ConnHwi()
+	defer dbhwi.Close()
+
+	var Count_id, Count_id_submission int
+	var Type string = "false"
+	var Status string = "resign"
+	var classification string = "Resign dahulu sebelum mengajukan resign"
+
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", Number_of_employees).
+		Scan(&Count_id_submission)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if Count_id_submission > 0 {
+		classification = "Mengajukan resign tetapi resign sebelum waktunya"
+	}
+
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND date_resignation_submissions <= ?", Number_of_employees, Date_out).
+		Scan(&Count_id)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if Count_id > 0 {
+		Type = "true"
+		classification = "Sudah mengajukan resign dan resign sesuai procedure"
+	}
+	output := map[string]interface{}{
+		"type":           Type,
+		"classification": classification,
+		"status":         Status,
+	}
 	return output
 }
 
@@ -2546,8 +3074,13 @@ func main() {
 
 	r := mux.NewRouter()
 
-	//Submissions
 	r.HandleFunc("/", Index).Methods("GET")
+	r.HandleFunc("/dashboard", Dashboard).Methods("GET")
+
+	//Employee
+	r.HandleFunc("/employeeaction", EmployeeAction).Methods("POST")
+
+	//Submissions
 	r.HandleFunc("/employees/{number_of_employees}", Get).Methods("GET")
 	r.HandleFunc("/resign/{number_of_employees}/{national_id}", GetKaryawan).Methods("GET")
 	r.HandleFunc("/resigndate/{number_of_employees}/{national_id}", GetResign).Methods("GET")
@@ -2580,6 +3113,13 @@ func main() {
 	r.HandleFunc("/parklarings_certificate", GetParklaringCertificates).Methods("GET")
 	r.HandleFunc("/parklarings_certificateedit/{number_of_employees}", GetEditParklaringCertificate).Methods("GET")
 	r.HandleFunc("/parklarings_certificateupdate", GetUpdateParklaringCertificate).Methods("POST")
+
+	r.HandleFunc("/parklarings_experience", GetParklaringExperiences).Methods("GET")
+	r.HandleFunc("/parklarings_experienceedit/{number_of_employees}", GetEditParklaringExperience).Methods("GET")
+	r.HandleFunc("/parklarings_experienceupdate", GetUpdateParklaringExperience).Methods("POST")
+
+	//Letter
+	r.HandleFunc("/ExportLetter/{dataletter}", ExportLetter).Methods("GET")
 
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
