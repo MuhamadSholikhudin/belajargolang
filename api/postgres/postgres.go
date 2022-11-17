@@ -37,8 +37,8 @@ func CheckError(err error) {
 		panic(err)
 	}
 }
-1. Insert data into table
-Hepackage main
+// 1. Insert data into table
+// Hepackage main
 
 import (
 	"database/sql"
