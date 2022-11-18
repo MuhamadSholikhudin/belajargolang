@@ -1037,7 +1037,6 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 		case 1: // Karyawan di temukan
 
 			var resultemployee = Employee{}
-
 			// Menampilkan data karyawan
 			err = db.QueryRow("select name, COALESCE(date_of_birth, '0000-00-00'), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') as date_out, status_employee from employees where number_of_employees = ? ", Number_of_employees).
 				Scan(&resultemployee.Name, &resultemployee.Date_of_birth, &resultemployee.Hire_date, &resultemployee.Date_out, &resultemployee.Status_employee)
@@ -1066,11 +1065,10 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// ===================== RESULT
+			// ===================== RESULT ==========================
 
 			if Count_resigns > 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 				//Jika sudah resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
-
 				//fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan sudah resign")
 
 				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah mengajukan resign dan status karyawan sudah resign. </br>", Number_of_employees)
@@ -1079,7 +1077,6 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 
 			} else if Count_resigns == 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 				//Jika belum resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
-
 				//fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan statusnya menunggu")
 
 				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah resign dengan status pengajuan wait. </br>", Number_of_employees)
@@ -1094,7 +1091,6 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 					fmt.Println(err.Error())
 					return
 				}
-				//fmt.Println("INSERT DATA Submission type false")
 
 				_, err = dbhwi.Exec("INSERT INTO `kuesioners`( `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?) ", Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
 				if err != nil {
@@ -1231,12 +1227,10 @@ func GetGedungs(w http.ResponseWriter, r *http.Request) {
 	response := []string{
 		"GEDUNG A", "GEDUNG B", "GEDUNG C", "GEDUNG D", "GEDUNG E", "GEDUNG F", "GEDUNG G", "GEDUNG H", "LAMINATING", "GUDANG SETTING", "WAREHOUSE (MATERIAL)", "SABLON", "EMBOSS", "TRAINING CENTER", "MAIN OFFICE", "EPTE (BEACUKAI)", "POS SECURITY", "KANTOR SERIKAT", "MESS / DRIVER",
 	}
-
 	resp, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
 
 }
@@ -1355,15 +1349,14 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
 }
 
-func PostAcc(w http.ResponseWriter, r *http.Request) {
-	//untuk membuat json pertama kita harus set Header
+func PostStatus(w http.ResponseWriter, r *http.Request) {
+	//Untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
 
-	//mendecode requset body langsung menjadi json
+	//Mendecode requset body langsung menjadi json
 	data := ResignAcc{}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
@@ -1380,42 +1373,71 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 	var dbhwi, _ = ConnHwi()
 	defer dbhwi.Close()
 
-	// Update data resign status acc
-	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ORDER BY id DESC", data.Status_resign, data.Number_of_employees)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
+	var status_employee, status_submission string
 
-	var status_employee string
-	if data.Status_resign == "acc" {
+	switch status_employee {
+	case "acc":
 		status_employee = "notactive"
-	} else {
+		status_submission = "acc"
+	case "cancel_submission":
+		var Scanstatus_employee string
+		err = db.QueryRow("SELECT status_employee FROM employees WHERE number_of_employees = ?", data.Number_of_employees).Scan(&Scanstatus_employee)
+		status_employee = Scanstatus_employee
+		status_submission = "cancel"
+	case "cancel_and_active":
 		status_employee = "active"
+		status_submission = "cancel"
 	}
 
-	// edit employees
-	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ?  ORDER BY id DESC", status_employee, data.Number_of_employees)
+	// Update data resign status acc
+	_, err = dbhwi.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ORDER BY id DESC", status_submission, data.Number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	// Update employees
+	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, data.Number_of_employees)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
-	// select resign submissions
-	var Submission = ResignSubmission{}
-	err = dbhwi.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'),	type, reason, detail_reason, periode_of_service, age, suggestion,	status_resignsubmisssion,	using_media, classification FROM resignation_submissions WHERE number_of_employees = ?", data.Number_of_employees).
-		Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
+	switch data.Status_resign {
+	case "acc":
+		// Select resign submissions
+		var Submission = ResignSubmission{}
+		err = dbhwi.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'),	type, reason, detail_reason, periode_of_service, age, suggestion,	status_resignsubmisssion,	using_media, classification FROM resignation_submissions WHERE number_of_employees = ? ORDER BY id DESC", data.Number_of_employees).
+			Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		var Count_resign_id int
+		err = dbhwi.QueryRow("SELECT COUNT(id) FROM resigns WHERE number_of_employees = ?", data.Number_of_employees).
+			Scan(&Count_resign_id)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		if Count_resign_id == 0 {
+			//Insert data resigns
+			_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?, ?, ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, CekDateSubmission(data.Number_of_employees), Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, Submission.Status_resignsubmisssion, 0, DMYhms(), DMYhms())
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+		}
+	case "cancel_and_active":
+		_, err = dbhwi.Exec("DELETE FROM resigns WHERE number_of_employees = ?", data.Number_of_employees)
+
+		_, err = dbhwi.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees)
+
+		_, err = dbhwi.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees)
+
 	}
-	//insert data resigns
-	_, err = dbhwi.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, Submission.Classification, Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, Submission.Status_resignsubmisssion, 0, DMYhms(), DMYhms())
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	fmt.Println("Insert")
+
 	/*
 		var resign_id int
 		err = dbhwi.QueryRow("SELECT id FROM resigns WHERE created_at = ?", DMYhms()).
@@ -1439,7 +1461,6 @@ func PostAcc(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-
 	*/
 
 	response := map[string]interface{}{
@@ -3074,52 +3095,52 @@ func main() {
 
 	r := mux.NewRouter()
 
-	r.HandleFunc("/", Index).Methods("GET")
-	r.HandleFunc("/dashboard", Dashboard).Methods("GET")
+	r.HandleFunc("/api.v1", Index).Methods("GET")
+	r.HandleFunc("/api.v1/dashboard", Dashboard).Methods("GET")
 
 	//Employee
-	r.HandleFunc("/employeeaction", EmployeeAction).Methods("POST")
+	r.HandleFunc("/api.v1/employeeaction", EmployeeAction).Methods("POST")
 
 	//Submissions
-	r.HandleFunc("/employees/{number_of_employees}", Get).Methods("GET")
-	r.HandleFunc("/resign/{number_of_employees}/{national_id}", GetKaryawan).Methods("GET")
-	r.HandleFunc("/resigndate/{number_of_employees}/{national_id}", GetResign).Methods("GET")
-	r.HandleFunc("/resignjobs", GetJobs).Methods("GET")
-	r.HandleFunc("/resigndepartments", GetDepartments).Methods("GET")
-	r.HandleFunc("/resignbuildings", GetGedungs).Methods("GET")
-	r.HandleFunc("/resignalamat/{number_of_employees}", GetAlamat).Methods("GET")
+	r.HandleFunc("/api.v1/employees/{number_of_employees}", Get).Methods("GET")
+	r.HandleFunc("/api.v1/resign/{number_of_employees}/{national_id}", GetKaryawan).Methods("GET")
+	r.HandleFunc("/api.v1/resigndate/{number_of_employees}/{national_id}", GetResign).Methods("GET")
+	r.HandleFunc("/api.v1/resignjobs", GetJobs).Methods("GET")
+	r.HandleFunc("/api.v1/resigndepartments", GetDepartments).Methods("GET")
+	r.HandleFunc("/api.v1/resignbuildings", GetGedungs).Methods("GET")
+	r.HandleFunc("/api.v1/resignalamat/{number_of_employees}", GetAlamat).Methods("GET")
 
-	r.HandleFunc("/resignsubmissions", GetResignSubmission).Methods("GET")
-	r.HandleFunc("/resignsubmissions/{search}", GetResignSubmissionSearch).Methods("GET")
-	r.HandleFunc("/resignsubmissions/{number_of_employees}/{status_resign}", GetResignSubmissionStatus).Methods("GET")
-	r.HandleFunc("/resignsubmission_upload", UploadSubmission).Methods("POST")
-	r.HandleFunc("/resignsubmission_edit/{number_of_employees}", GetEditSubmission).Methods("GET")
-	r.HandleFunc("/resignsubmission_update", GetUpdateSubmission).Methods("POST")
+	r.HandleFunc("/api.v1/resignsubmissions", GetResignSubmission).Methods("GET")
+	r.HandleFunc("/api.v1/resignsubmissions/{search}", GetResignSubmissionSearch).Methods("GET")
+	r.HandleFunc("/api.v1/resignsubmissions/{number_of_employees}/{status_resign}", GetResignSubmissionStatus).Methods("GET")
+	r.HandleFunc("/api.v1/resignsubmission_upload", UploadSubmission).Methods("POST")
+	r.HandleFunc("/api.v1/resignsubmission_edit/{number_of_employees}", GetEditSubmission).Methods("GET")
+	r.HandleFunc("/api.v1/resignsubmission_update", GetUpdateSubmission).Methods("POST")
+	r.HandleFunc("/api.v1/resignsubmission_status", PostStatus).Methods("POST")
 
-	r.HandleFunc("/resign", Post).Methods("POST")
-	r.HandleFunc("/resignacc", PostAcc).Methods("POST")
-	r.HandleFunc("/ExportSubmission", ExportSubmission).Methods("GET")
+	r.HandleFunc("/api.v1/resign", Post).Methods("POST")
+	r.HandleFunc("/api.v1/ExportSubmission", ExportSubmission).Methods("GET")
 
 	//Resigns
-	r.HandleFunc("/resigns", GetResigns).Methods("GET")
-	r.HandleFunc("/resigns/upload", UploadResigns).Methods("POST")
-	r.HandleFunc("/resigns_edit/{number_of_employees}", GetEditResign).Methods("GET")
-	r.HandleFunc("/resigns_update", GetUpdateResign).Methods("POST")
-	r.HandleFunc("/resigns/makecertificate", PostCertifcate).Methods("POST")
-	r.HandleFunc("/resigns/makeexperience", PostExperience).Methods("POST")
-	r.HandleFunc("/ExportResign", ExportResign).Methods("GET")
+	r.HandleFunc("/api.v1/resigns", GetResigns).Methods("GET")
+	r.HandleFunc("/api.v1/resigns/upload", UploadResigns).Methods("POST")
+	r.HandleFunc("/api.v1/resigns_edit/{number_of_employees}", GetEditResign).Methods("GET")
+	r.HandleFunc("/api.v1/resigns_update", GetUpdateResign).Methods("POST")
+	r.HandleFunc("/api.v1/resigns/makecertificate", PostCertifcate).Methods("POST")
+	r.HandleFunc("/api.v1/resigns/makeexperience", PostExperience).Methods("POST")
+	r.HandleFunc("/api.v1/ExportResign", ExportResign).Methods("GET")
 
 	//Parklaring
-	r.HandleFunc("/parklarings_certificate", GetParklaringCertificates).Methods("GET")
-	r.HandleFunc("/parklarings_certificateedit/{number_of_employees}", GetEditParklaringCertificate).Methods("GET")
-	r.HandleFunc("/parklarings_certificateupdate", GetUpdateParklaringCertificate).Methods("POST")
+	r.HandleFunc("/api.v1/parklarings_certificate", GetParklaringCertificates).Methods("GET")
+	r.HandleFunc("/api.v1/parklarings_certificateedit/{number_of_employees}", GetEditParklaringCertificate).Methods("GET")
+	r.HandleFunc("/api.v1/parklarings_certificateupdate", GetUpdateParklaringCertificate).Methods("POST")
 
-	r.HandleFunc("/parklarings_experience", GetParklaringExperiences).Methods("GET")
-	r.HandleFunc("/parklarings_experienceedit/{number_of_employees}", GetEditParklaringExperience).Methods("GET")
-	r.HandleFunc("/parklarings_experienceupdate", GetUpdateParklaringExperience).Methods("POST")
+	r.HandleFunc("/api.v1/parklarings_experience", GetParklaringExperiences).Methods("GET")
+	r.HandleFunc("/api.v1/parklarings_experienceedit/{number_of_employees}", GetEditParklaringExperience).Methods("GET")
+	r.HandleFunc("/api.v1/parklarings_experienceupdate", GetUpdateParklaringExperience).Methods("POST")
 
 	//Letter
-	r.HandleFunc("/ExportLetter/{dataletter}", ExportLetter).Methods("GET")
+	r.HandleFunc("/api.v1/ExportLetter/{dataletter}", ExportLetter).Methods("GET")
 
 	// r.HandleFunc("/user/{id}", Update).Methods("PUT")
 	// r.HandleFunc("/user/{id}", Delete).Methods("DELETE")
