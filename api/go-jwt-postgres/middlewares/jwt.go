@@ -42,6 +42,13 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		fmt.Println("Ini token.Raw ", token.Raw)
 		fmt.Println("Ini token.Header ", token.Header)
 		fmt.Println("Ini token.Claims ", token.Claims)
+
+		// var dataclsdm map[string]interface{}
+		dataclsdm := claims.Username
+		fmt.Println("Ini dataclsdm  ", dataclsdm)
+
+		fmt.Println("claims11 ", dataclsdm)
+
 		fmt.Println("Ini token.Signature  ", token.Signature)
 		fmt.Println("Ini token.Valid      ", token.Valid)
 		fmt.Println("Ini token.Claims Username", reflect.TypeOf(token.Claims))
@@ -73,20 +80,6 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			helper.ResponseJSON(w, http.StatusUnauthorized, response)
 			return
 		}
-
-		// var user models.User
-		// if err := models.DB.Where("username = ?", userInput.Username).First(&user).Error; err != nil {
-		// 	switch err {
-		// 	case gorm.ErrRecordNotFound:
-		// 		response := map[string]string{"message": "Username atau password salah"}
-		// 		helper.ResponseJSON(w, http.StatusUnauthorized, response)
-		// 		return
-		// 	default:
-		// 		response := map[string]string{"message": err.Error()}
-		// 		helper.ResponseJSON(w, http.StatusInternalServerError, response)
-		// 		return
-		// 	}
-		// }
 
 		next.ServeHTTP(w, r)
 	})

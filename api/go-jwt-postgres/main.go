@@ -25,7 +25,7 @@ func main() {
 
 	api := r.PathPrefix("/api").Subrouter()
 	api.Use(middlewares.JWTMiddleware)
-	// api.Use(middlewares.AccessManagement)
+	api.Use(middlewares.AccessMiddleware)
 	api.HandleFunc("/products", productcontroller.Index).Methods("GET")
 
 	fmt.Println("Listen On PORT http://localhost:8080")
