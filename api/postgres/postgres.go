@@ -57,7 +57,6 @@ func GetCar(w http.ResponseWriter, r *http.Request) {
 	var car Car
 	db.First(&car, params["id"])
 	json.NewEncoder(w).Encode(&car)
-
 }
 
 func GetDriver(w http.ResponseWriter, r *http.Request) {
