@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"fmt"
 	"net/http"
 
 	"belajargolang/api/go-jwt-postgres/config"
@@ -24,16 +23,9 @@ func AccessMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		fmt.Println("Ini r.RequestURI ", r.RequestURI)
-
-		fmt.Println("Ini c ", c)
-
 		// mengambil token value
 		tokenString := c.Value
-		fmt.Println("Ini tokenString ", tokenString)
-
 		claims := &config.JWTClaim{}
-		fmt.Println("Ini claims ", claims)
 		// parsing token jwt
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 			return config.JWT_KEY, nil
@@ -41,9 +33,6 @@ func AccessMiddleware(next http.Handler) http.Handler {
 		if !token.Valid {
 
 		}
-		// var dataclsdm map[string]interface{}
-		fmt.Println("Ini claims.Username  => ", claims.Username)
-
 		var user models.User
 		if err := models.DB.First(&user, "username = ?", claims.Username).Error; err != nil {
 			switch err {
@@ -57,8 +46,6 @@ func AccessMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		fmt.Println(user)
-
 		var role models.Role
 		if err := models.DB.First(&role, "id = ?", user.Role_id).Error; err != nil {
 			switch err {
@@ -72,8 +59,6 @@ func AccessMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		fmt.Println(role)
-
 		var access_menu models.Access_menu
 		if err := models.DB.First(&access_menu, "role_id = ?", user.Role_id).Error; err != nil {
 			switch err {
@@ -87,8 +72,6 @@ func AccessMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		fmt.Println(access_menu)
-
 		var menu models.Menu
 		if err := models.DB.First(&menu, "id = ?", access_menu.Menu_id).Error; err != nil {
 			switch err {
@@ -102,8 +85,6 @@ func AccessMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		fmt.Println(menu)
-
 		var sub_menu models.Sub_Menu
 		if err := models.DB.First(&sub_menu, "id = ? AND url = ?", menu.Id, r.RequestURI).Error; err != nil {
 			switch err {
@@ -117,12 +98,6 @@ func AccessMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		fmt.Println(sub_menu)
-
 		next.ServeHTTP(w, r)
 	})
-}
-
-func GormError() {
-
 }
