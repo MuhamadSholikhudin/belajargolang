@@ -35,6 +35,8 @@ func main() {
 	r.HandleFunc("/api.v1/resignsubmission_update", controllers.GetUpdateSubmission).Methods("POST")
 	r.HandleFunc("/api.v1/resignsubmission_status", controllers.PostStatus).Methods("POST")
 	r.HandleFunc("/api.v1/ExportSubmission", controllers.ExportSubmission).Methods("GET")
+	r.HandleFunc("/api.v1/searchsubmission", controllers.SearchSubmission).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
+	r.HandleFunc("/api.v1/processaccsubmission", controllers.ProcessAccSubmission).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
 
 	//Resigns
 	r.HandleFunc("/api.v1/resigns", controllers.Resigns).Methods("GET")
@@ -56,6 +58,8 @@ func main() {
 
 	//Letter
 	r.HandleFunc("/api.v1/ExportLetter/{dataletter}", controllers.ExportLetter).Methods("GET")
+
+	r.Use(mux.CORSMethodMiddleware(r))
 
 	fmt.Println("LIsten on Port 10.10.42.6:8880")
 	http.ListenAndServe(":8880", r)

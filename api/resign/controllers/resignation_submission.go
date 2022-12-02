@@ -810,3 +810,278 @@ func ExportSubmission(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintln(w, "Download Sukses")
 }
+
+func SearchSubmission(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000/")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	if r.Method == "POST" {
+
+		dbresign, err := models.ConnResign()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer dbresign.Close()
+
+		decoder := json.NewDecoder(r.Body)
+		payload := struct {
+			Date_resignation_submission string `json:"date_resignation_submissions"`
+			Selectdatesubmission        string `json:"selectdatesubmission"`
+		}{}
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sqlsearch := fmt.Sprintf("SELECT number_of_employees, name, %s, status_resignsubmisssion FROM resignation_submissions WHERE %s LIKE '%%%s%%' AND status_resignsubmisssion = 'wait' ", payload.Selectdatesubmission, payload.Selectdatesubmission, payload.Date_resignation_submission)
+		rows, err := dbresign.Query(sqlsearch)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer rows.Close()
+
+		var tr string = ""
+		ind := 0
+		for rows.Next() {
+			var each = models.Resignation_submission{}
+			var Date_search string
+			var err = rows.Scan(&each.Number_of_employees, &each.Name, &Date_search, &each.Status_resignsubmisssion)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			ind += 1
+			tr = fmt.Sprintf(`
+				%s<tr>
+					<td>%d.</td>
+					<td>%s</td>
+					<td>%s</td>
+					<td>%s</td>
+					<td class="text-center">
+						<span>
+							<input class="form-check-input checkboxsubmission" id="%s" type="checkbox"
+								checked="checked">
+						</span>
+					</td>
+					</tr>
+					`, tr, ind, each.Number_of_employees, each.Name, Date_search, each.Number_of_employees)
+		}
+
+		tbody := fmt.Sprintf(`<div class="card">
+				<div class="card-header">
+				<div class="custom-control custom-checkbox">
+					<input class="custom-control-input" type="checkbox" id="checklistallsubmission" checked="checked" value="checkall" onclick="CheckboxSubmission();">
+					<label for="checklistallsubmission" class="custom-control-label"> Checklist All</label>
+				</div>
+				</div>
+				<div class="card-body p-0">
+					<table class="table table-sm">
+						<thead>
+						<tr>
+							<th>NO</th>
+							<th>NIK</th>
+							<th>Nama</th>
+							<th>Tanggal</th>
+							<th style="width: 10px;">Check</th>
+						</tr>
+						</thead>
+						<tbody> %s %s`, tr, `</tbody>
+				</table>
+			</div>
+		</div>`)
+
+		resp, err := json.Marshal(tbody)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		w.Write([]byte(resp))
+		return
+	}
+
+	// http.Error(w, "Only accept POST request", http.StatusBadRequest)
+	message := http.StatusBadRequest
+
+	resp, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+
+func ProcessAccSubmission(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000/")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	if r.Method == "POST" {
+
+		dbresign, err := models.ConnResign()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer dbresign.Close()
+
+		decoder := json.NewDecoder(r.Body)
+		payload := struct {
+			Data []string `json:"data"`
+		}{}
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(payload.Data) == 0 {
+			message := fmt.Sprint(" Tidak Ada Karyawan yang di Acc")
+			fmt.Println(message)
+			resp, err := json.Marshal(message)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			w.Write([]byte(resp))
+			return
+		}
+
+		for i := 0; i < len(payload.Data); i++ {
+			fmt.Printf("elemen %d : %s\n", i, payload.Data[i])
+
+			// _, err = dbresign.Exec("UPDATE resignation_submissions SET status_resignsubmisssion = 'acc' WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", payload.Data[i])
+			// if err != nil {
+			// 	fmt.Println(err.Error())
+			// 	return
+			// }
+			// AccSubmission(payload.Data[i], "acc")
+		}
+		message := fmt.Sprint(len(payload.Data), " Karyawan Berhasil di Acc")
+		resp, err := json.Marshal(message)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		w.Write([]byte(resp))
+		return
+
+	}
+
+	message := http.StatusBadRequest
+
+	resp, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+
+func AccSubmission(number_of_employees string, status_resign string) {
+
+	db, err := models.ConnHrd()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+
+	dbresign, err := models.ConnResign()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbresign.Close()
+
+	var status_employee, status_submission string
+
+	switch status_resign {
+	case "acc":
+		status_employee = "notactive"
+		status_submission = "acc"
+	case "cancel_submission":
+		var Scanstatus_employee string
+		err = db.QueryRow("SELECT status_employee FROM employees WHERE number_of_employees = ?", number_of_employees).Scan(&Scanstatus_employee)
+		status_employee = Scanstatus_employee
+		status_submission = "cancel"
+	case "cancel_and_active":
+		status_employee = "active"
+		status_submission = "cancel"
+	}
+
+	// Update employees
+	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	// Update data resign status acc
+	_, err = dbresign.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", status_submission, number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	switch status_resign {
+	case "acc":
+		// Select resign submissions
+		var Submission = models.Resignation_submission{}
+		err = dbresign.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'),	type, reason, detail_reason, periode_of_service, age, suggestion,	status_resignsubmisssion,	using_media, classification FROM resignation_submissions WHERE number_of_employees = ? ORDER BY id DESC", number_of_employees).
+			Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		var Count_resign_id int
+		err = dbresign.QueryRow("SELECT COUNT(id) FROM resigns WHERE number_of_employees = ?", number_of_employees).
+			Scan(&Count_resign_id)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		if Count_resign_id == 0 {
+			//Insert data resigns
+			_, err = dbresign.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?, ?, ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, helper.CekDateSubmission(number_of_employees), Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, "acc", 0, helper.DMYhms(), helper.DMYhms())
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+		} else {
+			//Insert data resigns
+			_, err = dbresign.Exec("UPDATE resigns SET status_resign = ? WHERE number_of_employees = ?", status_resign, number_of_employees)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+		}
+
+	case "cancel_and_active":
+		_, err = dbresign.Exec("DELETE FROM resigns WHERE number_of_employees = ?", number_of_employees)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		_, err = dbresign.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", number_of_employees)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		_, err = dbresign.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", number_of_employees)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+	}
+
+}
