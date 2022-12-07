@@ -6,6 +6,10 @@ github.com/DefinitelyMod/gocsv v0.0.0-20181205141819-acfa5f112b45/go.mod h1:+nlr
 github.com/Masterminds/semver/v3 v3.1.1 h1:hLg3sBzpNErnxhQtUy/mmLR2I9foDujNK030IGemrRc=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/PuerkitoBio/goquery v1.5.1/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
+github.com/SebastiaanKlippert/go-wkhtmltopdf v1.8.1 h1:JPJV3byi3xKLDlAFnYAnzBbG6vi8ebmllt1cIqutx20=
+github.com/SebastiaanKlippert/go-wkhtmltopdf v1.8.1/go.mod h1:G/CvZyK2KGylD8ljeJ6iswF/TDHkZ99qQLyZZ+faQv8=
+github.com/adrg/go-wkhtmltopdf v0.3.0 h1:Zy/bbS6fPlAzuogW5uKa/sLX+SNWwV2DvVued0ZD55c=
+github.com/adrg/go-wkhtmltopdf v0.3.0/go.mod h1:PabO59E2w5GMKC8apqcXmf5rZZmiydIP3H1Wb4Uox6I=
 github.com/andybalholm/cascadia v1.1.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
 github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d h1:Byv0BzEl3/e6D5CLfI0j/7hiIEtvGVFPCZ7Ei2oq8iQ=
 github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
@@ -156,6 +160,8 @@ github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
 github.com/novalagung/gubrak/v2 v2.0.1 h1:OmabeSZsnf8Yd4FSZfm3F6VG2XoEsQBpktwtkjiCLdg=
 github.com/novalagung/gubrak/v2 v2.0.1/go.mod h1:zilliNLzP2RSdZ67Sz7NdqI4bg3j5zUTFR34tuXopA0=
+github.com/pdfcrowd/pdfcrowd-go v0.0.0-20221129123105-1f3249e96587 h1:2JKD9oDAjeH9rRuaHe/tncjwZfpnh2l7c2lg00g8UAA=
+github.com/pdfcrowd/pdfcrowd-go v0.0.0-20221129123105-1f3249e96587/go.mod h1:qQrwSVNK8CkWP7k/6qRJXCCaoOI6c1cdLu/0pcNjYgE=
 github.com/pelletier/go-toml/v2 v2.0.1 h1:8e3L2cCQzLFi2CR4g7vGFuFxX7Jl1kKX8gW+iV0GUKU=
 github.com/pelletier/go-toml/v2 v2.0.1/go.mod h1:r9LEWfGN8R5k0VXJ+0BkIe7MYkRdwZOjgMj2KwnJFUo=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=

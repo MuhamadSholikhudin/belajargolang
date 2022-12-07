@@ -192,7 +192,7 @@ func TypeResign(Number_of_employees string, Date_out string) map[string]interfac
 
 	var Count_id, Count_id_submission int
 	var Type string = "false"
-	var Status string = "resign"
+	var Status string = "wait"
 	var classification string = "Resign dahulu sebelum mengajukan resign"
 
 	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", Number_of_employees).

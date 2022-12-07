@@ -3,6 +3,7 @@ package controllers
 import (
 	"belajargolang/api/resign/helper"
 	"belajargolang/api/resign/models"
+	"belajargolang/api/resign/repository"
 	"bufio"
 	"bytes"
 	"encoding/json"
@@ -31,6 +32,8 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
+	fmt.Println("BISA")
+
 	db, err := models.ConnResign()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -45,6 +48,13 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Print(err.Error())
 	}
+
+	// Update Resign
+	var data2 = map[string]interface{}{
+		"status_resign": "acc",
+	}
+	where := fmt.Sprintf("number_of_employees = %d ", Resign_id)
+	repository.UpdateResign("resigns", data2, where)
 
 	var CountCertifcateNumberOf_employees int
 
@@ -63,11 +73,16 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Print(err.Error())
 		}
-		// create certificate
-		_, err := db.Exec("INSERT INTO certificate_of_employments (resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", Resign_id, data.Number_of_employees, helper.DMY(), (CountNoCertificateEmployee + 1), helper.Rom(helper.StringMonth()), helper.DMYhms(), helper.DMYhms())
-		if err != nil {
-			fmt.Print(err.Error())
+		data := map[string]interface{}{
+			"resign_id":                 Resign_id,
+			"number_of_employees":       data.Number_of_employees,
+			"date_certificate_employee": helper.DMY(),
+			"no_certificate_employee":   (CountNoCertificateEmployee + 1),
+			"rom":                       helper.Rom(helper.StringMonth()),
+			"created_at":                helper.DMYhms(),
+			"updated_at":                helper.DMYhms(),
 		}
+		repository.InsertResign("certificate_of_employments", data)
 	}
 
 	var certifictaeofemploment = models.Letter{}
@@ -133,28 +148,39 @@ func PostExperience(w http.ResponseWriter, r *http.Request) {
 		fmt.Print(err.Error())
 	}
 
-	var CountCertifcateNumberOf_employees int
+	// Update Resign
+	var data2 = map[string]interface{}{
+		"status_resign": "acc",
+	}
+	where := fmt.Sprintf("number_of_employees = %d ", Resign_id)
+	repository.UpdateResign("resigns", data2, where)
 
+	var CountExperienceNumberOf_employees int
 	err = db.QueryRow("SELECT COUNT(*) FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees).
-		Scan(&CountCertifcateNumberOf_employees)
+		Scan(&CountExperienceNumberOf_employees)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
 
-	if CountCertifcateNumberOf_employees == 0 {
-		var CountCertificateByDate, CountNoCertificateEmployee int
+	if CountExperienceNumberOf_employees == 0 {
+		var CountExperienceByDate, CountNoExperienceEmployee int
 		var yearstring string
 		yearstring = strconv.Itoa(time.Now().Year())
-		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", yearstring, helper.StringMonth()).
-			Scan(&CountCertificateByDate, &CountNoCertificateEmployee)
+		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_letter_exprerience) = ? AND MONTH(date_letter_exprerience) = ? ORDER BY date_letter_exprerience DESC", yearstring, helper.StringMonth()).
+			Scan(&CountExperienceByDate, &CountNoExperienceEmployee)
 		if err != nil {
 			fmt.Print(err.Error())
 		}
-		// create certificate
-		_, err := db.Exec("INSERT INTO work_experience_letters (resign_id, number_of_employees, date_letter_exprerience, no_letter_experience, rom, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", Resign_id, data.Number_of_employees, helper.DMY(), (CountNoCertificateEmployee + 1), helper.Rom(helper.StringMonth()), helper.DMYhms(), helper.DMYhms())
-		if err != nil {
-			fmt.Print(err.Error())
+		data := map[string]interface{}{
+			"resign_id":               Resign_id,
+			"number_of_employees":     data.Number_of_employees,
+			"date_letter_exprerience": helper.DMY(),
+			"no_letter_experience":    (CountNoExperienceEmployee + 1),
+			"rom":                     helper.Rom(helper.StringMonth()),
+			"created_at":              helper.DMYhms(),
+			"updated_at":              helper.DMYhms(),
 		}
+		repository.InsertResign("work_experience_letters", data)
 	}
 
 	var certifictaeofemploment = models.Letter{}
@@ -313,7 +339,6 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 		var each = models.Letter{}
 		var err = rows.
 			Scan(&each.Id, &each.Resign_id, &each.Number_of_employees, &each.Date, &each.No, &each.Rom, &each.Created_at, &each.Updated_at)
-
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -327,9 +352,7 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
-
 		var data = map[string]interface{}{"id": each.Id, "number_of_employees": each.Number_of_employees, "name": Resign.Name, "hire_date": Resign.Hire_date, "date_out": Resign.Date_out, "position": Resign.Position, "department": Resign.Department, "date_letter": each.Date, "no_letter": each.No, "rom": each.Rom, "created_at": each.Created_at, "update_at": each.Updated_at}
-
 		letter = append(letter, data)
 	}
 
@@ -867,4 +890,252 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, t)
 
 	fmt.Fprintln(w, "Download Sukses")
+}
+
+func SearchLetter(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	if r.Method == "POST" {
+		dbresign, err := models.ConnResign()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer dbresign.Close()
+
+		decoder := json.NewDecoder(r.Body)
+		payload := struct {
+			Date          string `json:"date"`
+			Selectcoloumn string `json:"selectcoloumn"`
+		}{}
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sqlsearch := fmt.Sprintf("SELECT resigns.number_of_employees, resigns.name, certificate_of_employments.date_certificate_employee FROM certificate_of_employments JOIN resigns ON certificate_of_employments.resign_id = resigns.id WHERE certificate_of_employments.date_certificate_employee = '%s' ", payload.Date)
+		rows, err := dbresign.Query(sqlsearch)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer rows.Close()
+
+		var tr string = ""
+		ind := 0
+		for rows.Next() {
+			var each = models.Resign{}
+			var Date_search string
+			var err = rows.Scan(&each.Number_of_employees, &each.Name, &Date_search)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			ind += 1
+			tr = fmt.Sprintf(`
+				%s<tr>
+					<td>%d.</td>
+					<td>%s</td>
+					<td>%s</td>
+					<td>%s</td>
+					<td class="text-center">
+						<span>
+							<input class="form-check-input checkboxletter" id="%s" type="checkbox" checked="checked">
+						</span>
+					</td>
+					</tr>
+					`, tr, ind, each.Number_of_employees, each.Name, Date_search, each.Number_of_employees)
+		}
+		tbody := fmt.Sprintf(`<div class="card">
+				<div class="card-header">
+				<div class="custom-control custom-checkbox">
+					<input class="custom-control-input" type="checkbox" id="checklistallletter" checked="checked" value="checkall" onclick="CheckboxLetter();">
+					<label for="checklistallletter" class="custom-control-label"> Checklist All</label>
+				</div>
+				</div>
+				<div class="card-body p-0">
+					<table class="table table-sm">
+						<thead>
+						<tr>
+							<th>NO</th>
+							<th>NIK</th>
+							<th>Nama</th>
+							<th>Tanggal</th>
+							<th style="width: 10px;">Check</th>
+						</tr>
+						</thead>
+						<tbody> %s %s`, tr, `</tbody>
+				</table>
+			</div>
+		</div>`)
+		resp, err := json.Marshal(tbody)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		w.Write([]byte(resp))
+		return
+	}
+	message := http.StatusBadRequest
+	resp, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	if r.Method == "POST" {
+		dbresign, err := models.ConnResign()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer dbresign.Close()
+
+		decoder := json.NewDecoder(r.Body)
+		payload := struct {
+			Data []string `json:"data"`
+		}{}
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(payload.Data) == 0 {
+			message := fmt.Sprint(" Tidak Ada Karyawan yang di Acc")
+			fmt.Println(message)
+			resp, err := json.Marshal(message)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			w.Write([]byte(resp))
+			return
+		}
+
+		var data []interface{}
+		for i := 0; i < len(payload.Data); i++ {
+			data = append(data, DataLetter(payload.Data[i]))
+		}
+		result := map[string]interface{}{
+			"data":    data,
+			"code":    200,
+			"message": "Successfully",
+		}
+		resp, err := json.Marshal(result)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		w.Write([]byte(resp))
+		return
+
+		/*
+			baseURL := "http://127.0.0.1:8000/resigns_parklaring/loopcertificate"
+			method := "POST"
+			data1 := result
+
+			responseBody, err := doRequest(baseURL+"/data", method, data1)
+			if err != nil {
+				log.Println("ERROR", err.Error())
+				return
+			}
+			log.Printf("%#v \n", responseBody)
+
+			resp, err := json.Marshal(responseBody)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			w.Write([]byte(resp))
+			return
+
+		*/
+	}
+	message := http.StatusBadRequest
+	resp, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+
+func DataLetter(number_of_employees string) map[string]interface{} {
+
+	dbresign, _ := models.ConnResign()
+	defer dbresign.Close()
+
+	var Resign_id int
+	var ResignSel = models.Resign{}
+	_ = dbresign.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", number_of_employees).
+		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
+
+	var certifictaeofemploment = models.Letter{}
+	_ = dbresign.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", number_of_employees).
+		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
+
+	dataletter := map[string]interface{}{
+		"number_of_employees": certifictaeofemploment.Number_of_employees,
+		"name":                ResignSel.Name,
+		"position":            ResignSel.Position,
+		"department":          ResignSel.Department,
+		"hire_date":           ResignSel.Hire_date,
+		"date_out":            ResignSel.Date_out,
+		"date":                certifictaeofemploment.Date,
+		"no":                  certifictaeofemploment.No,
+		"rom":                 certifictaeofemploment.Rom,
+		"created_at":          certifictaeofemploment.Created_at,
+		"updated_at":          certifictaeofemploment.Updated_at,
+		"classification":      "certificate",
+	}
+	return dataletter
+}
+
+type M map[string]interface{}
+
+func doRequest(url, method string, data interface{}) (map[string]interface{}, error) {
+	var payload *bytes.Buffer = nil
+
+	if data != nil {
+		payload = new(bytes.Buffer)
+		err := json.NewEncoder(payload).Encode(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	request, err := http.NewRequest(method, url, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	client := new(http.Client)
+
+	response, err := client.Do(request)
+	if response != nil {
+		defer response.Body.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(response.Body)
+	responseBody := make(M)
+	err = json.NewDecoder(response.Body).Decode(&responseBody)
+	if err != nil {
+		return nil, err
+	}
+
+	return responseBody, nil
 }

@@ -4,11 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
-
-	"github.com/gin-gonic/gin"
-
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -40,13 +38,11 @@ func main() {
 		var version string
 
 		err2 := db.QueryRow("SELECT VERSION()").Scan(&version)
-
 		if err2 != nil {
 			c.JSON(500, gin.H{
 				"error": err2,
 			})
 		}
-
 		//fmt.Println(version)
 		c.JSON(200, gin.H{
 			"version_mysql": version,
@@ -95,11 +91,8 @@ func main() {
 
 		result := []City{}
 		for CityRows.Next() {
-
 			var id int
-
 			var name string
-
 			var population int
 			err = CityRows.Scan(&id, &name, &population)
 			if err != nil {
@@ -108,13 +101,9 @@ func main() {
 				})
 				return
 			}
-
 			cityList.Id = id
-
 			cityList.Name = name
-
 			cityList.Population = population
-
 			result = append(result, cityList)
 
 		}

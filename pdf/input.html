@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <style>
+        body{
+            margin: 0%;
+        }
+        #experience{
+            /* background-image: url("HWASEUNG transparan.png"); */
+            /* background-image: url( public_path('img/HWASEUNG transparan.png') ); */
+            background-repeat: no-repeat;
+            background-size: 470px 200px;
+            background-position: 40% 45%;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="experience" id="experience" style="border: 1px solid blue; width:700px;">
+        <table >
+            <tr>
+                <td>
+                    <img src=" public_path('img/HWASEUNG.png') " alt="" style="width: 70px; height:60px;">
+                </td>
+                <td style="width: 600px; text-align: center;">
+                    <div style="margin: 0%; font-size:20px; font-weight:800px;">PT. HWA SEUNG INDONESIA</div>
+                    <div style="text-align: center; font-weight:800px;">Jalan Krasak Banyuputih RT.09 RW.03 Kecamatan Kalinyamatan Kabupaten Jepara,</div>
+                    <div style="text-align: center; font-weight:800px;">Provinsi Jawa Tengah, Indonesia 59467 Tel: (0291) 7512198 Fax: (0291) 7512191</div>
+                </td>
+            </tr>
+        </table>
+        <hr style="border: 2px solid black;">
+        <h2 style="text-align: center; margin:0%; ">SURAT KETERANGAN KERJA</h2>
+        <div style="text-align: center; margin:0%; font-size: 24px;"> <i>CERTICATE OF EMPLOYMENT</i> </div>
+        <div style="text-align: center; margin:0%; font-size: 20px; font-family: 'Gill Sans', sans-serif;"> NO.  $response->data->no /SKK_HR/HWI/ $response->data->rom /<?php echo date('Y', strtotime($response->data->date));   </div>
+
+        <div style="padding: 30px;">
+            <p>
+                PT Hwa Seung Indonesia dengan ini Menerangkan bahwa :
+            </p>
+            <table>
+                <tr>
+                    <td valign="top" style="padding-bottom: 5px;">
+                        Nama    <br> <i>Name</i>
+                    </td>
+                    <td valign="top">:</td>
+                    <td valign="top"> $response->data->name </td>
+                </tr>
+                <tr>
+                    <td valign="top" style="padding-bottom: 5px;">
+                        NIK <br> <i>Employee Id</i>
+                    </td>
+                    <td valign="top">:</td>
+                    <td valign="top"> $response->data->number_of_employees </td>
+                </tr>
+                <tr>
+                    <td valign="top" style="padding-bottom: 5px;">
+                        Jabatan <br> <i>Position </i>
+                    </td>
+                    <td valign="top">:</td>
+                    <td valign="top"> $response->data->position </td>
+                </tr>
+                <tr>
+                    <td valign="top" style="padding-bottom: 5px;">
+                        Bagian / Department <br> <i> Department</i>
+
+                    </td>
+                    <td valign="top">:</td>
+                    <td valign="top"> $response->data->department </td>
+                </tr>
+                <tr>
+                    <td valign="top" style="padding-bottom: 5px;">
+                        Lama Bekerja  <br> <i>Periode of Service</i>
+                    </td>
+                    <td valign="top">:</td>
+                    <td valign="top"> DateIndo($response->data->hire_date, false)  s/d  DateIndo($response->data->date_out, false)  </td>
+                </tr>
+            </table>
+            <p style="text-justify: revert-layer;">
+                Selama bekerja di PT Hwa Seung Indonesia, Saudara telah menunjukan kemampuan dengan baik. Atas jasa-jasanya kami ucapkan terima kasih.
+            </p>
+            <br>
+            <p>
+                Jepara,  DateIndo($response->data->date, false) 
+            </p>
+            <p>Human Resources Development,</p>
+            <br>
+            <br>
+            <p>
+                <u>GUNTUR SUHENDRO</u> <br>
+                Kepala Dept. HRD
+            </p>
+        </div>
+    </div>
+</body>
+</html>

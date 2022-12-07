@@ -3,6 +3,7 @@ package controllers
 import (
 	"belajargolang/api/resign/helper"
 	"belajargolang/api/resign/models"
+	"belajargolang/api/resign/repository"
 	"bufio"
 	"bytes"
 	"encoding/csv"
@@ -36,18 +37,15 @@ func Submissions(w http.ResponseWriter, r *http.Request) {
 		Scan(&count_submission)
 
 	if count_submission == 0 {
-
 		var datanull = []map[string]string{
 			{"number_of_employees": "NULL", "name": "NULL", "created_at": "NULL", "date_resignation_submissions": "NULL", "position": "NULL", "department": "NULL", "status_resignsubmisssion": "NULL"},
 		}
-
 		result := map[string]interface{}{
 			"code":  404,
 			"meta":  "NULL",
 			"data":  datanull,
 			"links": "NULL",
 		}
-
 		resp, err := json.Marshal(result)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -71,13 +69,12 @@ func Submissions(w http.ResponseWriter, r *http.Request) {
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
 	if checkNumber_of_employees != false {
 		justStringnumber_of_employees := strings.Join(number_of_employees, "")
-		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' order by created_at desc", sqlPaging, justStringnumber_of_employees)
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' ORDER BY id DESC", sqlPaging, justStringnumber_of_employees)
 		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
 
 	var total int64
-
 	db.QueryRow(sqlCount).Scan(&total)
 
 	if total == 0 {
@@ -572,97 +569,89 @@ func PostStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	ProsessSubmission(data.Number_of_employees, data.Status_resign)
 
-	db, err := models.ConnHrd()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	defer db.Close()
+	/*
+		var status_employee, status_submission string
+		switch data.Status_resign {
+		case "acc":
+			status_employee = "notactive"
+			status_submission = "acc"
+		case "cancel_submission":
+			var Scanstatus_employee string
+			err = db.QueryRow("SELECT status_employee FROM employees WHERE number_of_employees = ?", data.Number_of_employees).Scan(&Scanstatus_employee)
+			status_employee = Scanstatus_employee
+			status_submission = "cancel"
+		case "cancel_and_active":
+			status_employee = "active"
+			status_submission = "cancel"
+		}
 
-	var dbresign, _ = models.ConnResign()
-	defer dbresign.Close()
-
-	var status_employee, status_submission string
-
-	switch data.Status_resign {
-	case "acc":
-		status_employee = "notactive"
-		status_submission = "acc"
-	case "cancel_submission":
-		var Scanstatus_employee string
-		err = db.QueryRow("SELECT status_employee FROM employees WHERE number_of_employees = ?", data.Number_of_employees).Scan(&Scanstatus_employee)
-		status_employee = Scanstatus_employee
-		status_submission = "cancel"
-	case "cancel_and_active":
-		status_employee = "active"
-		status_submission = "cancel"
-	}
-
-	// Update data resign status acc
-	_, err = dbresign.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ORDER BY id DESC", status_submission, data.Number_of_employees)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	// Update employees
-	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, data.Number_of_employees)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	switch data.Status_resign {
-	case "acc":
-		// Select resign submissions
-		var Submission = models.Resignation_submission{}
-		err = dbresign.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'),	type, reason, detail_reason, periode_of_service, age, suggestion,	status_resignsubmisssion,	using_media, classification FROM resignation_submissions WHERE number_of_employees = ? ORDER BY id DESC", data.Number_of_employees).
-			Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
+		// Update data resign status acc
+		_, err = dbresign.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? ORDER BY id DESC", status_submission, data.Number_of_employees)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		// Update employees
+		_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, data.Number_of_employees)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		var Count_resign_id int
-		err = dbresign.QueryRow("SELECT COUNT(id) FROM resigns WHERE number_of_employees = ?", data.Number_of_employees).
-			Scan(&Count_resign_id)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-
-		if Count_resign_id == 0 {
-			//Insert data resigns
-			_, err = dbresign.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?, ?, ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, helper.CekDateSubmission(data.Number_of_employees), Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, data.Status_resign, 0, helper.DMYhms(), helper.DMYhms())
+		switch data.Status_resign {
+		case "acc":
+			// Select resign submissions
+			var Submission = models.Resignation_submission{}
+			err = dbresign.QueryRow("SELECT number_of_employees,	name,	position,	department,	building,	hire_date,	COALESCE(date_out, '0000-00-00') as date_out, COALESCE(date_resignation_submissions, '0000-00-00'),	type, reason, detail_reason, periode_of_service, age, suggestion,	status_resignsubmisssion,	using_media, classification FROM resignation_submissions WHERE number_of_employees = ? ORDER BY id DESC", data.Number_of_employees).
+				Scan(&Submission.Number_of_employees, &Submission.Name, &Submission.Position, &Submission.Department, &Submission.Building, &Submission.Hire_date, &Submission.Date_out, &Submission.Date_resignation_submissions, &Submission.Type, &Submission.Reason, &Submission.Detail_reason, &Submission.Periode_of_service, &Submission.Age, &Submission.Suggestion, &Submission.Status_resignsubmisssion, &Submission.Using_media, &Submission.Classification)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
-		} else {
-			//Insert data resigns
-			_, err = dbresign.Exec("UPDATE resigns SET status_resign = ? WHERE number_of_employees = ?", data.Status_resign, data.Number_of_employees)
+
+			var Count_resign_id int
+			err = dbresign.QueryRow("SELECT COUNT(id) FROM resigns WHERE number_of_employees = ?", data.Number_of_employees).
+				Scan(&Count_resign_id)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+
+			if Count_resign_id == 0 {
+				//Insert data resigns
+				_, err = dbresign.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?, ?, ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, helper.CekDateSubmission(data.Number_of_employees), Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, data.Status_resign, 0, helper.DMYhms(), helper.DMYhms())
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+			} else {
+				//Insert data resigns
+				_, err = dbresign.Exec("UPDATE resigns SET status_resign = ? WHERE number_of_employees = ?", data.Status_resign, data.Number_of_employees)
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+			}
+		case "cancel_and_active":
+			_, err = dbresign.Exec("DELETE FROM resigns WHERE number_of_employees = ?", data.Number_of_employees)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			_, err = dbresign.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			_, err = dbresign.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
 		}
-	case "cancel_and_active":
-		_, err = dbresign.Exec("DELETE FROM resigns WHERE number_of_employees = ?", data.Number_of_employees)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-		_, err = dbresign.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-		_, err = dbresign.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	}
+	*/
 
 	response := map[string]interface{}{
 		"status_resign": data.Status_resign,
@@ -813,7 +802,7 @@ func ExportSubmission(w http.ResponseWriter, r *http.Request) {
 
 func SearchSubmission(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000/")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
 	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	if r.Method == "POST" {
@@ -917,7 +906,7 @@ func SearchSubmission(w http.ResponseWriter, r *http.Request) {
 
 func ProcessAccSubmission(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000/")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
 	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	if r.Method == "POST" {
@@ -952,14 +941,7 @@ func ProcessAccSubmission(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for i := 0; i < len(payload.Data); i++ {
-			fmt.Printf("elemen %d : %s\n", i, payload.Data[i])
-
-			// _, err = dbresign.Exec("UPDATE resignation_submissions SET status_resignsubmisssion = 'acc' WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", payload.Data[i])
-			// if err != nil {
-			// 	fmt.Println(err.Error())
-			// 	return
-			// }
-			// AccSubmission(payload.Data[i], "acc")
+			ProsessSubmission(payload.Data[i], "acc")
 		}
 		message := fmt.Sprint(len(payload.Data), " Karyawan Berhasil di Acc")
 		resp, err := json.Marshal(message)
@@ -967,7 +949,6 @@ func ProcessAccSubmission(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
-
 		w.Write([]byte(resp))
 		return
 
@@ -985,14 +966,14 @@ func ProcessAccSubmission(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func AccSubmission(number_of_employees string, status_resign string) {
+func ProsessSubmission(number_of_employees string, status_resign string) {
 
-	db, err := models.ConnHrd()
+	dbhrd, err := models.ConnHrd()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	defer db.Close()
+	defer dbhrd.Close()
 
 	dbresign, err := models.ConnResign()
 	if err != nil {
@@ -1000,36 +981,6 @@ func AccSubmission(number_of_employees string, status_resign string) {
 		return
 	}
 	defer dbresign.Close()
-
-	var status_employee, status_submission string
-
-	switch status_resign {
-	case "acc":
-		status_employee = "notactive"
-		status_submission = "acc"
-	case "cancel_submission":
-		var Scanstatus_employee string
-		err = db.QueryRow("SELECT status_employee FROM employees WHERE number_of_employees = ?", number_of_employees).Scan(&Scanstatus_employee)
-		status_employee = Scanstatus_employee
-		status_submission = "cancel"
-	case "cancel_and_active":
-		status_employee = "active"
-		status_submission = "cancel"
-	}
-
-	// Update employees
-	_, err = db.Exec("UPDATE `employees` SET `status_employee`= ? WHERE number_of_employees = ? ", status_employee, number_of_employees)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	// Update data resign status acc
-	_, err = dbresign.Exec("UPDATE `resignation_submissions` SET `status_resignsubmisssion`= ? WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", status_submission, number_of_employees)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
 
 	switch status_resign {
 	case "acc":
@@ -1051,37 +1002,103 @@ func AccSubmission(number_of_employees string, status_resign string) {
 		}
 
 		if Count_resign_id == 0 {
-			//Insert data resigns
-			_, err = dbresign.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?,	?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?, ?, ?)", Submission.Number_of_employees, Submission.Name, Submission.Position, Submission.Department, Submission.Hire_date, helper.CekDateSubmission(number_of_employees), Submission.Date_resignation_submissions, Submission.Date_resignation_submissions, Submission.Periode_of_service, Submission.Type, Submission.Age, "acc", 0, helper.DMYhms(), helper.DMYhms())
-			if err != nil {
-				fmt.Println(err.Error())
-				return
+			var data = map[string]interface{}{
+				"number_of_employees":    Submission.Number_of_employees,
+				"name":                   Submission.Name,
+				"position":               Submission.Position,
+				"department":             Submission.Department,
+				"hire_date":              Submission.Hire_date,
+				"classification":         helper.TypeResign(number_of_employees, Submission.Date_resignation_submissions)["classification"],
+				"date_out":               Submission.Date_resignation_submissions,
+				"date_resignsubmissions": Submission.Date_resignation_submissions,
+				"periode_of_service":     Submission.Periode_of_service,
+				"type":                   helper.TypeResign(number_of_employees, Submission.Date_resignation_submissions)["type"],
+				"age":                    Submission.Age,
+				"status_resign":          "wait",
+				"printed":                0,
+				"created_at":             helper.DMYhms(),
+				"updated_at":             helper.DMYhms(),
 			}
+			repository.InsertResign("resigns", data)
+
+			var data1 = map[string]interface{}{
+				"date_out":        Submission.Date_resignation_submissions,
+				"status_employee": "notactive",
+				"exit_statement":  Submission.Reason,
+			}
+			where1 := fmt.Sprintf("number_of_employees = '%s' ", number_of_employees)
+			repository.UpdateHrd("employees", data1, where1)
+
+			var data2 = map[string]interface{}{
+				"status_resignsubmisssion": status_resign,
+				"date_out":                 Submission.Date_resignation_submissions,
+			}
+			where2 := fmt.Sprintf("number_of_employees = '%s' AND status_resignsubmisssion = 'wait' ", number_of_employees)
+			repository.UpdateResign("resignation_submissions", data2, where2)
+
 		} else {
-			//Insert data resigns
-			_, err = dbresign.Exec("UPDATE resigns SET status_resign = ? WHERE number_of_employees = ?", status_resign, number_of_employees)
+
+			var date_out string
+			err = dbhrd.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ?", number_of_employees).
+				Scan(&date_out)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
+
+			var data = map[string]interface{}{
+				"status_resignsubmisssion": status_resign,
+				"date_out":                 date_out,
+			}
+			where := fmt.Sprintf("number_of_employees = '%s' AND status_resignsubmisssion = 'wait' ", number_of_employees)
+			repository.UpdateResign("resignation_submissions", data, where)
+
+			var data2 = map[string]interface{}{
+				"type":                   helper.TypeResign(number_of_employees, date_out)["type"],
+				"classification":         helper.TypeResign(number_of_employees, date_out)["classification"],
+				"status_resign":          helper.TypeResign(number_of_employees, date_out)["status"],
+				"date_resignsubmissions": Submission.Date_resignation_submissions,
+			}
+			where2 := fmt.Sprintf("number_of_employees = '%s' ", number_of_employees)
+			repository.UpdateResign("resigns", data2, where2)
 		}
 
 	case "cancel_and_active":
-		_, err = dbresign.Exec("DELETE FROM resigns WHERE number_of_employees = ?", number_of_employees)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+
+		where := fmt.Sprintf("number_of_employees = '%s' ", number_of_employees)
+		repository.DeleteResign("work_experience_letters", where)
+		repository.DeleteResign("certificate_of_employments", where)
+		repository.DeleteResign("resigns", where)
+
+		var data1 = map[string]interface{}{
+			"date_out":        nil,
+			"status_employee": "active",
+			"exit_statement":  nil,
 		}
-		_, err = dbresign.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", number_of_employees)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+		where1 := fmt.Sprintf("number_of_employees = '%s' ", number_of_employees)
+		repository.UpdateHrd("employees", data1, where1)
+
+		var data2 = map[string]interface{}{
+			"status_resignsubmisssion": "wait",
 		}
-		_, err = dbresign.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", number_of_employees)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
+		where2 := fmt.Sprintf("number_of_employees = '%s' AND status_resignsubmisssion = 'acc' ", number_of_employees)
+		repository.UpdateResign("resignation_submissions", data2, where2)
+
+	case "cancel_submission":
+
+		var data = map[string]interface{}{
+			"status_resignsubmisssion": "cancel",
 		}
+		where := fmt.Sprintf("number_of_employees = '%s' AND status_resignsubmisssion = 'wait' ", number_of_employees)
+		repository.UpdateResign("resignation_submissions", data, where)
+
+		var data2 = map[string]interface{}{
+			"date_out":        nil,
+			"status_employee": "active",
+			"exit_statement":  nil,
+		}
+		where2 := fmt.Sprintf("number_of_employees = '%s' ", number_of_employees)
+		repository.UpdateHrd("employees", data2, where2)
 	}
 
 }

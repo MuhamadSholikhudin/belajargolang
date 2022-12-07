@@ -3,6 +3,7 @@ package controllers
 import (
 	"belajargolang/api/resign/helper"
 	"belajargolang/api/resign/models"
+	"belajargolang/api/resign/repository"
 	"bufio"
 	"bytes"
 	"encoding/csv"
@@ -15,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/gorilla/mux"
@@ -63,7 +65,7 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
 	if checkNumber_of_employees != false {
 		justStringnumber_of_employees := strings.Join(number_of_employees, "")
-		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlPaging, justStringnumber_of_employees)
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' ORDER BY id DESC", sqlPaging, justStringnumber_of_employees)
 		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
@@ -74,14 +76,12 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 		var datanull = []map[string]string{
 			{"id": "NULL", "number_of_employees": "NULL", "name": "NULL", "hire_date": "NULL", "date_out": "NULL", "date_resignsubmissions": "NULL", "position": "NULL", "department": "NULL", "type": "NULL", "age": "0", "status_resign": "NULL", "printed": "NULL", "created_at": "NULL", "updated_at": "NULL"},
 		}
-
 		result := map[string]interface{}{
 			"code":  404,
 			"meta":  "NULL",
 			"data":  datanull,
 			"links": "NULL",
 		}
-
 		resp, err := json.Marshal(result)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -412,7 +412,6 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 				fmt.Println(err.Error())
 				return
 			}
-
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("A%d", no), Resign.Number_of_employees)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("B%d", no), Resign.Name)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("C%d", no), Resign.Position)
@@ -446,4 +445,227 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, t)
 
 	fmt.Fprintln(w, "Download Sukses")
+}
+
+func Searchresign(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	if r.Method == "POST" {
+		dbresign, err := models.ConnResign()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer dbresign.Close()
+
+		decoder := json.NewDecoder(r.Body)
+		payload := struct {
+			Date_out      string `json:"date_out"`
+			Selectcoloumn string `json:"selectcoloumn"`
+		}{}
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sqlsearch := fmt.Sprintf("SELECT number_of_employees, name, %s, status_resign FROM resigns WHERE %s LIKE '%%%s%%' AND status_resign = 'wait' ", payload.Selectcoloumn, payload.Selectcoloumn, payload.Date_out)
+		rows, err := dbresign.Query(sqlsearch)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer rows.Close()
+
+		var tr string = ""
+		ind := 0
+		for rows.Next() {
+			var each = models.Resign{}
+			var Date_search string
+			var err = rows.Scan(&each.Number_of_employees, &each.Name, &Date_search, &each.Status_resign)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			ind += 1
+			tr = fmt.Sprintf(`
+				%s<tr>
+					<td>%d.</td>
+					<td>%s</td>
+					<td>%s</td>
+					<td>%s</td>
+					<td class="text-center">
+						<span>
+							<input class="form-check-input checkboxresign" id="%s" type="checkbox" checked="checked">
+						</span>
+					</td>
+					</tr>
+					`, tr, ind, each.Number_of_employees, each.Name, Date_search, each.Number_of_employees)
+		}
+
+		tbody := fmt.Sprintf(`<div class="card">
+				<div class="card-header">
+				<div class="custom-control custom-checkbox">
+					<input class="custom-control-input" type="checkbox" id="checklistallresign" checked="checked" value="checkall" onclick="CheckboxResign();">
+					<label for="checklistallresign" class="custom-control-label"> Checklist All</label>
+				</div>
+				</div>
+				<div class="card-body p-0">
+					<table class="table table-sm">
+						<thead>
+						<tr>
+							<th>NO</th>
+							<th>NIK</th>
+							<th>Nama</th>
+							<th>Tanggal</th>
+							<th style="width: 10px;">Check</th>
+						</tr>
+						</thead>
+						<tbody> %s %s`, tr, `</tbody>
+				</table>
+			</div>
+		</div>`)
+		resp, err := json.Marshal(tbody)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		w.Write([]byte(resp))
+		return
+	}
+	message := http.StatusBadRequest
+	resp, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+
+func ProcessAccResign(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	if r.Method == "POST" {
+		dbresign, err := models.ConnResign()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer dbresign.Close()
+
+		decoder := json.NewDecoder(r.Body)
+		payload := struct {
+			Data []string `json:"data"`
+		}{}
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(payload.Data) == 0 {
+			message := fmt.Sprint(" Tidak Ada Karyawan yang di Acc")
+			fmt.Println(message)
+			resp, err := json.Marshal(message)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			w.Write([]byte(resp))
+			return
+		}
+		for i := 0; i < len(payload.Data); i++ {
+			AccResign(payload.Data[i], "acc")
+		}
+		message := fmt.Sprint(len(payload.Data), " Karyawan Berhasil di Acc")
+		resp, err := json.Marshal(message)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		w.Write([]byte(resp))
+		return
+	}
+	message := http.StatusBadRequest
+	resp, err := json.Marshal(message)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	w.Write([]byte(resp))
+	return
+}
+
+func AccResign(number_of_employees string, status_resign string) {
+
+	dbresign, err := models.ConnResign()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbresign.Close()
+
+	// Update Resign
+	var data = map[string]interface{}{
+		"status_resign": status_resign,
+	}
+	where := fmt.Sprintf("number_of_employees = '%s' AND status_resign = 'wait' ", number_of_employees)
+	repository.UpdateResign("resigns", data, where)
+
+	var Resign_id int
+	var resign models.Resign
+	err = dbresign.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), periode_of_service, type FROM resigns WHERE number_of_employees = ? ", number_of_employees).
+		Scan(&Resign_id, &resign.Name, &resign.Position, &resign.Department, &resign.Hire_date, &resign.Date_out, &resign.Periode_of_service, &resign.Type)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
+	var yearstring string
+	yearstring = strconv.Itoa(time.Now().Year())
+
+	var CountCertificateByDate, CountNoCertificateEmployee int
+	err = dbresign.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_certificate_employee, 0) as no_certificate_employee FROM certificate_of_employments WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", yearstring, helper.StringMonth()).
+		Scan(&CountCertificateByDate, &CountNoCertificateEmployee)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
+	var CountExperienceByDate, CountNoExperienceEmployee int
+	err = dbresign.QueryRow("SELECT COUNT(id) as CountExperienceByDate, COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_letter_exprerience) = ? AND MONTH(date_letter_exprerience) = ? ORDER BY date_letter_exprerience DESC", yearstring, helper.StringMonth()).
+		Scan(&CountExperienceByDate, &CountNoExperienceEmployee)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+
+	var CountCertificate, CountExperience int
+	CountCertificate = repository.CountResign("certificate_of_employments", fmt.Sprintf("number_of_employees = '%s' ", number_of_employees))
+	CountExperience = repository.CountResign("work_experience_letters", fmt.Sprintf("number_of_employees = '%s' ", number_of_employees))
+
+	if CountCertificate < 1 && resign.Periode_of_service >= 365 && resign.Type == "true" {
+		var data = map[string]interface{}{
+			"resign_id":                 Resign_id,
+			"number_of_employees":       number_of_employees,
+			"date_certificate_employee": helper.DMY(),
+			"no_certificate_employee":   (CountNoCertificateEmployee + 1),
+			"rom":                       helper.Rom(helper.StringMonth()),
+			"created_at":                helper.DMYhms(),
+			"updated_at":                helper.DMYhms(),
+		}
+		repository.InsertResign("certificate_of_employments", data)
+	} else if CountExperience == 0 {
+		var data = map[string]interface{}{
+			"resign_id":               Resign_id,
+			"number_of_employees":     number_of_employees,
+			"date_letter_exprerience": helper.DMY(),
+			"no_letter_experience":    (CountNoExperienceEmployee + 1),
+			"rom":                     helper.Rom(helper.StringMonth()),
+			"created_at":              helper.DMYhms(),
+			"updated_at":              helper.DMYhms(),
+		}
+		repository.InsertResign("work_experience_letters", data)
+	}
 }

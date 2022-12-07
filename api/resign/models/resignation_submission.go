@@ -1,6 +1,7 @@
 package models
 
 type Resignation_submission struct {
+	Id                           string `json:"id"`
 	Number_of_employees          string `json:"number_of_employees"`
 	Name                         string `json:"name"`
 	Position                     string `json:"position"`

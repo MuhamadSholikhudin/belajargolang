@@ -46,6 +46,8 @@ func main() {
 	r.HandleFunc("/api.v1/resigns/makecertificate", controllers.PostCertifcate).Methods("POST")
 	r.HandleFunc("/api.v1/resigns/makeexperience", controllers.PostExperience).Methods("POST")
 	r.HandleFunc("/api.v1/ExportResign", controllers.ExportResign).Methods("GET")
+	r.HandleFunc("/api.v1/searchresign", controllers.Searchresign).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
+	r.HandleFunc("/api.v1/processaccresign", controllers.ProcessAccResign).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
 
 	//Parklaring
 	r.HandleFunc("/api.v1/parklarings_certificate", controllers.GetParklaringCertificates).Methods("GET")
@@ -58,6 +60,8 @@ func main() {
 
 	//Letter
 	r.HandleFunc("/api.v1/ExportLetter/{dataletter}", controllers.ExportLetter).Methods("GET")
+	r.HandleFunc("/api.v1/searchletter", controllers.SearchLetter).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
+	r.HandleFunc("/api.v1/processaccletter", controllers.ProcessAccLetter).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
 
 	r.Use(mux.CORSMethodMiddleware(r))
 

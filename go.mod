@@ -24,7 +24,10 @@ require (
 	gorm.io/gorm v1.24.1
 )
 
+require github.com/pdfcrowd/pdfcrowd-go v0.0.0-20221129123105-1f3249e96587 // indirect
+
 require (
+	github.com/SebastiaanKlippert/go-wkhtmltopdf v1.8.1
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
