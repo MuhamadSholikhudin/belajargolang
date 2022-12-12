@@ -31,9 +31,6 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
-	fmt.Println("BISA")
-
 	db, err := models.ConnResign()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -91,7 +88,6 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-
 	certificate := map[string]interface{}{
 		"id":                  certifictaeofemploment.Id,
 		"resign_id":           certifictaeofemploment.Resign_id,
@@ -107,18 +103,15 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 		"created_at":          certifictaeofemploment.Created_at,
 		"updated_at":          certifictaeofemploment.Updated_at,
 	}
-
 	result := map[string]interface{}{
 		"code":    200,
 		"data":    certificate,
 		"message": "Succesfully",
 	}
-
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
 }
 
@@ -207,7 +200,6 @@ func PostExperience(w http.ResponseWriter, r *http.Request) {
 		"created_at":          certifictaeofemploment.Created_at,
 		"updated_at":          certifictaeofemploment.Updated_at,
 	}
-
 	result := map[string]interface{}{
 		"code":    200,
 		"data":    certificate,
@@ -218,7 +210,6 @@ func PostExperience(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
 }
 
@@ -528,7 +519,6 @@ func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(resp))
 		return
 	}
-
 	u, err := url.Parse(r.RequestURI)
 	if err != nil {
 		log.Fatal(err)
@@ -542,11 +532,10 @@ func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
 	if checkNumber_of_employees != false {
 		justStringnumber_of_employees := strings.Join(number_of_employees, "")
-		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlPaging, justStringnumber_of_employees)
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' ORDER BY id DESC", sqlPaging, justStringnumber_of_employees)
 		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
-
 	var total int64
 	db.QueryRow(sqlCount).Scan(&total)
 	if total == 0 {
@@ -656,7 +645,6 @@ func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
 		"data":  letter,
 		"links": links,
 	}
-
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -773,17 +761,15 @@ func GetUpdateParklaringExperience(w http.ResponseWriter, r *http.Request) {
 }
 
 func ExportLetter(w http.ResponseWriter, r *http.Request) {
-
-	vars := mux.Vars(r)
-
-	dataletter, _ := vars["dataletter"]
-
 	dbresign, err := models.ConnResign()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer dbresign.Close()
+
+	vars := mux.Vars(r)
+	dataletter, _ := vars["dataletter"]
 
 	var table, letter_Date, letter_No string
 
@@ -823,13 +809,15 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 	xlsx.SetCellValue(sheet1Name, "D1", "DEPARTMENT")
 	xlsx.SetCellValue(sheet1Name, "E1", "HIRE DATE =DATE(LEFT(E2,4), MID(E2,6,2), RIGHT(E2,2))")
 	xlsx.SetCellValue(sheet1Name, "F1", "DATE OUT =DATE(LEFT(F2,4), MID(F2,6,2), RIGHT(F2,2))")
-	xlsx.SetCellValue(sheet1Name, "G1", "TYPE")
-	xlsx.SetCellValue(sheet1Name, "H1", "NOMOR SURAT")
-	xlsx.SetCellValue(sheet1Name, "I1", "STATUS SURAT")
-	xlsx.SetCellValue(sheet1Name, "J1", "CLASSIFIKASI")
-	xlsx.SetCellValue(sheet1Name, "K1", "UMUR")
-	xlsx.SetCellValue(sheet1Name, "L1", "CREATEAD AT")
-	xlsx.SetCellValue(sheet1Name, "M1", "UPDATED AT")
+	xlsx.SetCellValue(sheet1Name, "G1", "NOMOR SURAT")
+	xlsx.SetCellValue(sheet1Name, "H1", "ROM")
+	xlsx.SetCellValue(sheet1Name, "I1", "TAHUN")
+	xlsx.SetCellValue(sheet1Name, "J1", "TYPE")
+	xlsx.SetCellValue(sheet1Name, "K1", "STATUS SURAT")
+	xlsx.SetCellValue(sheet1Name, "L1", "CLASSIFIKASI")
+	xlsx.SetCellValue(sheet1Name, "M1", "UMUR")
+	xlsx.SetCellValue(sheet1Name, "N1", "CREATEAD AT")
+	xlsx.SetCellValue(sheet1Name, "O1", "UPDATED AT")
 
 	var wg sync.WaitGroup
 
@@ -843,7 +831,7 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 		}
 		no = (no + 1)
 		wg.Add(1)
-		go func(wg *sync.WaitGroup, no int, Resign_id int, Date string, No string, Rom string, Created_at string, Updated_at string) {
+		go func(wg *sync.WaitGroup, no int, Resign_id int, Date string, No int, Rom string, Created_at string, Updated_at string) {
 			defer wg.Done()
 			var Resign models.Resign
 
@@ -853,20 +841,21 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 				fmt.Println(err.Error())
 				return
 			}
-
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("A%d", no), Resign.Number_of_employees)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("B%d", no), Resign.Name)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("C%d", no), Resign.Position)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("D%d", no), Resign.Department)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("E%d", no), Resign.Hire_date)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("F%d", no), Resign.Date_out)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), Resign.Type)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), helper.NomorLetter(No, "/SKK_HR/HWI/", Rom, Date))
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), Resign.Status_resign)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Resign.Classification)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Resign.Age)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Resign.Created_at)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Updated_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("G%d", no), No)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("H%d", no), Rom)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("I%d", no), helper.YearMysql(Date))
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("J%d", no), Resign.Type)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("K%d", no), Resign.Status_resign)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("L%d", no), Resign.Classification)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Age)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("N%d", no), Resign.Created_at)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("O%d", no), Resign.Updated_at)
 
 		}(&wg, no, letter.Resign_id, letter.Date, letter.No, letter.Rom, letter.Created_at, letter.Updated_at)
 	}
@@ -907,14 +896,20 @@ func SearchLetter(w http.ResponseWriter, r *http.Request) {
 
 		decoder := json.NewDecoder(r.Body)
 		payload := struct {
-			Date          string `json:"date"`
-			Selectcoloumn string `json:"selectcoloumn"`
+			Date             string `json:"date"`
+			Get_value_resign string `json:"get_value_resign"`
+			Selectcoloumn    string `json:"selectcoloumn"`
 		}{}
 		if err := decoder.Decode(&payload); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sqlsearch := fmt.Sprintf("SELECT resigns.number_of_employees, resigns.name, certificate_of_employments.date_certificate_employee FROM certificate_of_employments JOIN resigns ON certificate_of_employments.resign_id = resigns.id WHERE certificate_of_employments.date_certificate_employee = '%s' ", payload.Date)
+		sqlsearch := fmt.Sprintf(`SELECT 
+		resigns.number_of_employees, resigns.name, %s.date_%s FROM %s JOIN resigns ON %s.resign_id = resigns.id 
+		WHERE 
+		%s.date_%s = '%s' `,
+			payload.Selectcoloumn, payload.Get_value_resign, payload.Selectcoloumn, payload.Selectcoloumn, payload.Selectcoloumn, payload.Get_value_resign, payload.Date)
+
 		rows, err := dbresign.Query(sqlsearch)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -941,11 +936,11 @@ func SearchLetter(w http.ResponseWriter, r *http.Request) {
 					<td>%s</td>
 					<td class="text-center">
 						<span>
-							<input class="form-check-input checkboxletter" id="%s" type="checkbox" checked="checked">
+							<input class="form-check-input checkboxletter" value="%s" name="check[]" id="%s" type="checkbox" checked="checked">
 						</span>
 					</td>
 					</tr>
-					`, tr, ind, each.Number_of_employees, each.Name, Date_search, each.Number_of_employees)
+					`, tr, ind, each.Number_of_employees, each.Name, Date_search, each.Number_of_employees, each.Number_of_employees)
 		}
 		tbody := fmt.Sprintf(`<div class="card">
 				<div class="card-header">
@@ -1023,7 +1018,7 @@ func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
 
 		var data []interface{}
 		for i := 0; i < len(payload.Data); i++ {
-			data = append(data, DataLetter(payload.Data[i]))
+			data = append(data, DataLetter(payload.Data[i], "q", "2"))
 		}
 		result := map[string]interface{}{
 			"data":    data,
@@ -1037,29 +1032,6 @@ func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write([]byte(resp))
 		return
-
-		/*
-			baseURL := "http://127.0.0.1:8000/resigns_parklaring/loopcertificate"
-			method := "POST"
-			data1 := result
-
-			responseBody, err := doRequest(baseURL+"/data", method, data1)
-			if err != nil {
-				log.Println("ERROR", err.Error())
-				return
-			}
-			log.Printf("%#v \n", responseBody)
-
-			resp, err := json.Marshal(responseBody)
-			if err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-
-			w.Write([]byte(resp))
-			return
-
-		*/
 	}
 	message := http.StatusBadRequest
 	resp, err := json.Marshal(message)
@@ -1072,7 +1044,42 @@ func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func DataLetter(number_of_employees string) map[string]interface{} {
+func PrintLetter(w http.ResponseWriter, r *http.Request) {
+	dbresign, err := models.ConnResign()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbresign.Close()
+	decoder := json.NewDecoder(r.Body)
+	payload := struct {
+		Number_of_employees []string `json:"number_of_employees"`
+		Table               string   `json:"table"`
+		Column              string   `json:"column"`
+	}{}
+	if err := decoder.Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var data []interface{}
+	for i := 0; i < len(payload.Number_of_employees); i++ {
+		data = append(data, DataLetter(payload.Number_of_employees[i], payload.Table, payload.Column))
+	}
+	result := map[string]interface{}{
+		"data":    data,
+		"code":    200,
+		"message": "Successfully",
+	}
+	resp, err := json.Marshal(result)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	w.Write([]byte(resp))
+	return
+}
+
+func DataLetter(number_of_employees string, table string, column string) map[string]interface{} {
 
 	dbresign, _ := models.ConnResign()
 	defer dbresign.Close()
@@ -1083,11 +1090,13 @@ func DataLetter(number_of_employees string) map[string]interface{} {
 		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
 
 	var certifictaeofemploment = models.Letter{}
-	_ = dbresign.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", number_of_employees).
+	queryletter := fmt.Sprintf(`SELECT id, resign_id, number_of_employees, date_%s, no_%s, rom, created_at, updated_at FROM %s WHERE number_of_employees = '%s' `, column, column, table, number_of_employees)
+	_ = dbresign.QueryRow(queryletter).
+		// _ = dbresign.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", number_of_employees).
 		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
 
 	dataletter := map[string]interface{}{
-		"number_of_employees": certifictaeofemploment.Number_of_employees,
+		"number_of_employees": number_of_employees,
 		"name":                ResignSel.Name,
 		"position":            ResignSel.Position,
 		"department":          ResignSel.Department,
@@ -1098,7 +1107,6 @@ func DataLetter(number_of_employees string) map[string]interface{} {
 		"rom":                 certifictaeofemploment.Rom,
 		"created_at":          certifictaeofemploment.Created_at,
 		"updated_at":          certifictaeofemploment.Updated_at,
-		"classification":      "certificate",
 	}
 	return dataletter
 }

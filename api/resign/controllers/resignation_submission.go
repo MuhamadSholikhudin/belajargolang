@@ -69,8 +69,8 @@ func Submissions(w http.ResponseWriter, r *http.Request) {
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
 	if checkNumber_of_employees != false {
 		justStringnumber_of_employees := strings.Join(number_of_employees, "")
-		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' ORDER BY id DESC", sqlPaging, justStringnumber_of_employees)
-		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ORDER BY resignation_submissions.id DESC", sqlPaging, justStringnumber_of_employees, justStringnumber_of_employees)
+		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ", sqlCount, justStringnumber_of_employees, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
 
@@ -81,7 +81,6 @@ func Submissions(w http.ResponseWriter, r *http.Request) {
 		var datanull = []map[string]string{
 			{"number_of_employees": "NULL", "name": "NULL", "created_at": "NULL", "date_resignation_submissions": "NULL", "position": "NULL", "department": "NULL", "status_resignsubmisssion": "NULL"},
 		}
-
 		result := map[string]interface{}{
 			"code":  404,
 			"meta":  "NULL",
@@ -198,7 +197,7 @@ func GetResignSubmissionSearch(w http.ResponseWriter, r *http.Request) {
 
 	search := s
 
-	where := " "
+	where := ""
 	where = fmt.Sprintf(" %s WHERE name LIKE '%%%s%%' OR number_of_employees LIKE '%%%s%%' ", where, search, search)
 
 	db, err := models.ConnResign()
@@ -317,85 +316,134 @@ func UploadSubmission(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// ===================== RESULT ==========================
-
 			var resignation_submission_id int
 
 			if Count_resigns > 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 				//Jika sudah resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
-				//fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan sudah resign")
-
-				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah mengajukan resign dan status karyawan sudah resign. </br>", Number_of_employees)
+				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah mengajukan resign dan status karyawan sudah resign. \n", Number_of_employees)
 				notification = append(notification, each)
 				code = 400
 
 			} else if Count_resigns == 0 && Count_resign_submissions > 0 && Count_status_resign_submissions != "cancel" {
 				//Jika belum resign dan sudah mengajukan dan pegajuannya tidak cancel maka tidak dapat mengajukan lagi
-				//fmt.Println("Pengajuan ", Number_of_employees, " tidak dapat di simpan karena sudah mengajukan dan statusnya menunggu")
-
-				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah resign dengan status pengajuan wait. </br>", Number_of_employees)
+				each := fmt.Sprintf("NIK ini %s tidak dapat mengajukan resign karena sudah resign dengan status pengajuan wait. \n", Number_of_employees)
 				notification = append(notification, each)
 				code = 400
 
-			} else if Count_resigns == 1 && Count_resign_submissions == 0 {
+			} else if Count_resign_submissions == 0 {
 				//Sudah resign tapi belum mengajukan resign maka boleh mengajukan
-				_, err = dbresign.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `address`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], record[3], resultemployee.Hire_date, resultemployee.Date_out, record[4], "false", record[3], record[6], helper.Periode_of_serve(resultemployee.Hire_date, record[4]), helper.Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
-				if err != nil {
-					fmt.Println(err.Error())
-					return
-				}
-				err = dbresign.QueryRow("SELECT id FROM resignation_submissions WHERE number_of_employees = ? AND created_at = ? ", Number_of_employees, record[0]).
-					Scan(&resignation_submission_id)
-				if err != nil {
-					fmt.Println(err.Error())
-					return
-				}
-				_, err = dbresign.Exec("INSERT INTO `kuesioners`( `resignation_submission_id`, `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ", resignation_submission_id, Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
-				if err != nil {
-					fmt.Println(err.Error())
-					return
+				/*
+					_, err = dbresign.Exec("INSERT INTO `resignation_submissions`
+					(`number_of_employees`, `name`, `position`, `department`, `building`, `address`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )",
+					Number_of_employees, resultemployee.Name, record[5], record[9], record[9], record[3], resultemployee.Hire_date, resultemployee.Date_out, record[4], "false", record[3], record[6], helper.Periode_of_serve(resultemployee.Hire_date, record[4]), helper.Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				*/
+				var typesubmissions, classificationsubmissions string
+				typesubmissions = "false"
+				classificationsubmissions = "Mengajukan permohonan resign setelah karyawan resign"
+				switch Count_resigns {
+				case 0:
+					if Status_employee == "active" {
+						typesubmissions = "true"
+						classificationsubmissions = "Mengajukan permohonan resign sebelum karyawan resign"
+					}
 				}
 
-			} else if Count_resigns == 0 && Count_resign_submissions == 0 {
-				// TIdak resign dan belum mengajukan resign maka boleh mengajukan resign
-				_, err = dbresign.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `address`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], record[3], resultemployee.Hire_date, resultemployee.Date_out, record[4], "true", record[3], record[6], helper.Periode_of_serve(resultemployee.Hire_date, record[4]), helper.Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
-				if err != nil {
-					fmt.Println(err.Error())
-					return
+				var datasubmissions = map[string]interface{}{
+					"number_of_employees":          Number_of_employees,
+					"name":                         resultemployee.Name,
+					"position":                     record[5],
+					"department":                   record[9],
+					"building":                     record[9],
+					"address":                      record[3],
+					"hire_date":                    resultemployee.Hire_date,
+					"date_out":                     resultemployee.Date_out,
+					"date_resignation_submissions": record[4],
+					"type":                         typesubmissions,
+					"reason":                       record[3],
+					"detail_reason":                record[6],
+					"periode_of_service":           helper.Periode_of_serve(resultemployee.Hire_date, record[4]),
+					"age":                          helper.Age(resultemployee.Date_of_birth),
+					"suggestion":                   record[7],
+					"status_resignsubmisssion":     "wait",
+					"using_media":                  "google",
+					"classification":               classificationsubmissions,
+					"print":                        0,
+					"created_at":                   record[0],
+					"updated_at":                   record[0],
 				}
+				repository.InsertResign("resignation_submissions", datasubmissions)
 				err = dbresign.QueryRow("SELECT id FROM resignation_submissions WHERE number_of_employees = ? AND created_at = ? ", Number_of_employees, record[0]).
 					Scan(&resignation_submission_id)
 				if err != nil {
 					fmt.Println(err.Error())
 					return
 				}
-				_, err = dbresign.Exec("INSERT INTO `kuesioners`(`resignation_submission_id`, `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ", resignation_submission_id, Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
-				if err != nil {
-					fmt.Println(err.Error())
-					return
+				/*
+					_, err = dbresign.Exec("INSERT INTO `kuesioners`( `resignation_submission_id`, `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ", resignation_submission_id, Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				*/
+				var datakuesioners = map[string]interface{}{
+					"resignation_submission_id": resignation_submission_id,
+					"number_of_employees":       Number_of_employees,
+					"k1":                        record[10],
+					"k2":                        record[11],
+					"k3":                        record[12],
+					"k4":                        record[13],
+					"k5":                        record[14],
+					"k6":                        record[15],
+					"k7":                        record[16],
+					"created_at":                record[0],
+					"updated_at":                record[0],
 				}
+				repository.InsertResign("kuesioners", datakuesioners)
+
 			}
+			/*
+				else if Count_resigns == 0 && Count_resign_submissions == 0 {
 
+						// TIdak resign dan belum mengajukan resign maka boleh mengajukan resign
+						_, err = dbresign.Exec("INSERT INTO `resignation_submissions` (`number_of_employees`, `name`, `position`, `department`, `building`, `address`, `hire_date`, `date_out`, `date_resignation_submissions`, `type`, `reason`, `detail_reason`, `periode_of_service`, `age`, `suggestion`, `status_resignsubmisssion`, `using_media`, `classification`, `print`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,? )", Number_of_employees, resultemployee.Name, record[5], record[9], record[9], record[3], resultemployee.Hire_date, resultemployee.Date_out, record[4], "true", record[3], record[6], helper.Periode_of_serve(resultemployee.Hire_date, record[4]), helper.Age(resultemployee.Date_of_birth), record[7], "wait", "google", "Mengajukan permohonan resign setelah karyawan resign", 0, record[0], record[0])
+						if err != nil {
+							fmt.Println(err.Error())
+							return
+						}
+
+					err = dbresign.QueryRow("SELECT id FROM resignation_submissions WHERE number_of_employees = ? AND created_at = ? ", Number_of_employees, record[0]).
+						Scan(&resignation_submission_id)
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+					_, err = dbresign.Exec("INSERT INTO `kuesioners`(`resignation_submission_id`, `number_of_employees`, `k1`, `k2`, `k3`, `k4`, `k5`, `k6`, `k7`, `created_at`, `updated_at`) VALUES (?,?,?,?,?,?,?,?,?,?,?) ", resignation_submission_id, Number_of_employees, record[10], record[11], record[12], record[13], record[14], record[15], record[16], record[0], record[0])
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+				}
+			*/
 		default:
-
 		}
 	}
 
 	//untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
-
 	result := map[string]interface{}{
 		"code":    code,
 		"data":    notification,
 		"message": "Succesfully",
 	}
-
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
 	w.Write([]byte(resp))
-
 }
 
 func GetEditSubmission(w http.ResponseWriter, r *http.Request) {
@@ -451,7 +499,6 @@ func GetUpdateSubmission(w http.ResponseWriter, r *http.Request) {
 
 	_, err = dbresign.Exec("UPDATE `resignation_submissions` SET `name`= ? ,`position`= ? ,`department`=  ? , `hire_date`= ? ,`date_out`= ? ,`date_resignation_submissions`= ? ,`type`= ? ,`reason`= ? ,`detail_reason`= ? ,`periode_of_service`= ? ,`age`= ? ,`suggestion`= ? ,`status_resignsubmisssion`= ? ,`using_media`= ? ,`classification`= ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Name, data.Position, data.Department, data.Hire_date, data.Date_out, data.Date_resignation_submissions, data.Type, data.Reason, data.Detail_reason, helper.Periode_of_serve(data.Hire_date, data.Date_resignation_submissions), data.Age, data.Suggestion, data.Status_resignsubmisssion, data.Using_media, data.Classification, data.Created_at, data.Updated_at, data.Number_of_employees)
 	if err != nil {
-
 		result := map[string]interface{}{
 			"code":    400,
 			"message": "Update Loss",
@@ -460,8 +507,6 @@ func GetUpdateSubmission(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-
-		fmt.Println(400)
 		w.Write([]byte(resp))
 		return
 	}
@@ -485,8 +530,6 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
-	// nik, _ := strconv.Atoi(vars["number_of_employees"])
-	// status_api, _ := strconv.Atoi(vars["status_resign"])
 	number_of_employees := vars["number_of_employees"]
 	status_resign := vars["status_resign"]
 
@@ -506,26 +549,12 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
-		fmt.Println("Acc Resign !")
-
 		// Update data employees
 		_, err = db.Exec("update employees set `status_employee` = ? where number_of_employees = ? ", "notactive", number_of_employees)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-		fmt.Println("Update Employee Resign !")
-
-		// // Insert data parklaring
-		// insert_parklaring := fmt.Sprintf("insert into  set status_employee = %s where number_of_employees = %s ", "notactive", number_of_employees)
-
-		// _, err = db.Exec(insert_parklaring)
-		// if err != nil {
-		// 	fmt.Println(err.Error())
-		// 	return
-		// }
-		// fmt.Println("Insert Parklaring Resign !")
-
 	} else if status_resign == "cancel" {
 
 		// Update data resign status acc
@@ -535,8 +564,6 @@ func GetResignSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err.Error())
 			return
 		}
-		fmt.Println("Update Employee Resign !")
-
 		// Update data employees
 		active_employee := fmt.Sprintf("update employee set status_employee = %s where number_of_employees = %s ", "notactive", number_of_employees)
 		_, err = db.Exec(active_employee)
@@ -685,7 +712,7 @@ func ExportSubmission(w http.ResponseWriter, r *http.Request) {
 
 	xlsx.SetSheetName(xlsx.GetSheetName(1), sheet1Name)
 
-	err = xlsx.AutoFilter(sheet1Name, "A1", "Q1", "")
+	err = xlsx.AutoFilter(sheet1Name, "A1", "Y1", "")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -715,7 +742,6 @@ func ExportSubmission(w http.ResponseWriter, r *http.Request) {
 	xlsx.SetCellValue(sheet1Name, "W1", "5. Jam kerja (termasuk shift malam) tidak masalah bagi saya")
 	xlsx.SetCellValue(sheet1Name, "X1", "6. Saya berkeinginan kembali ke perusahaan (PT HWI) suatu saat nanti")
 	xlsx.SetCellValue(sheet1Name, "Y1", "7. Keluarga (termasuk menikah, mengurus keluarga) bukanlah alasan bagi saya untuk meninggalkan perusahaan ini")
-	xlsx.SetCellValue(sheet1Name, "Z1", "")
 
 	var wg sync.WaitGroup
 
@@ -770,13 +796,13 @@ func ExportSubmission(w http.ResponseWriter, r *http.Request) {
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("Q%d", no), Submission.Updated_at)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("R%d", no), Submission.Date_resignation_submissions)
 
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("N%d", no), k1)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("O%d", no), k2)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("P%d", no), k3)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("Q%d", no), k4)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("R%d", no), k5)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("S%d", no), k6)
-			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("T%d", no), k7)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("S%d", no), k1)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("T%d", no), k2)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("U%d", no), k3)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("V%d", no), k4)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("W%d", no), k5)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("X%d", no), k6)
+			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("Y%d", no), k7)
 
 		}(&wg, Submission_id, NIK, no)
 	}
@@ -791,7 +817,7 @@ func ExportSubmission(w http.ResponseWriter, r *http.Request) {
 	fileSize := strconv.Itoa(len(fileContents))
 
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-disposition", "attachment;filename=Data_Pengajuan_Design.xlsx")
+	w.Header().Set("Content-disposition", "attachment;filename=Data_Pengajuan_Resign.xlsx")
 	w.Header().Set("Content-Length", fileSize)
 
 	t := bytes.NewReader(b.Bytes())
@@ -929,13 +955,11 @@ func ProcessAccSubmission(w http.ResponseWriter, r *http.Request) {
 
 		if len(payload.Data) == 0 {
 			message := fmt.Sprint(" Tidak Ada Karyawan yang di Acc")
-			fmt.Println(message)
 			resp, err := json.Marshal(message)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
-
 			w.Write([]byte(resp))
 			return
 		}
@@ -1037,7 +1061,6 @@ func ProsessSubmission(number_of_employees string, status_resign string) {
 			repository.UpdateResign("resignation_submissions", data2, where2)
 
 		} else {
-
 			var date_out string
 			err = dbhrd.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ?", number_of_employees).
 				Scan(&date_out)
@@ -1064,7 +1087,6 @@ func ProsessSubmission(number_of_employees string, status_resign string) {
 		}
 
 	case "cancel_and_active":
-
 		where := fmt.Sprintf("number_of_employees = '%s' ", number_of_employees)
 		repository.DeleteResign("work_experience_letters", where)
 		repository.DeleteResign("certificate_of_employments", where)

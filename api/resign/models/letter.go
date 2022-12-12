@@ -5,7 +5,7 @@ type Letter struct {
 	Resign_id           int    `json:"resign_id"`
 	Number_of_employees string `json:"number_of_employees"`
 	Date                string `json:"date"`
-	No                  string `json:"no"`
+	No                  int    `json:"no"`
 	Rom                 string `json:"rom"`
 	Status              string `json:"status"`
 	Action              string `json:"action"`

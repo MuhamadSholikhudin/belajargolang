@@ -3,6 +3,7 @@ package controllers
 import (
 	"belajargolang/api/resign/helper"
 	"belajargolang/api/resign/models"
+	"belajargolang/api/resign/repository"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -101,7 +102,6 @@ func EmployeeAction(w http.ResponseWriter, r *http.Request) {
 	var message string
 
 	if r.Method == "POST" {
-
 		var data models.Employee
 		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
@@ -110,18 +110,14 @@ func EmployeeAction(w http.ResponseWriter, r *http.Request) {
 
 		if data.Status_employee == "active" {
 			//Menghapus data resign
-
-			_, err = dbhwi.Exec("DELETE FROM resigns WHERE number_of_employees = ?", data.Number_of_employees)
-
-			_, err = dbhwi.Exec("DELETE FROM certificate_of_employments WHERE number_of_employees = ?", data.Number_of_employees)
-
-			_, err = dbhwi.Exec("DELETE FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees)
-
+			where := fmt.Sprintf("number_of_employees = '%s' ", data.Number_of_employees)
+			repository.DeleteResign("work_experience_letters", where)
+			repository.DeleteResign("certificate_of_employments", where)
+			repository.DeleteResign("resigns", where)
 			message = fmt.Sprintf("Data resign %s berhasil di hapus", data.Number_of_employees)
 
 		} else if data.Status_employee == "notactive" {
 			//menambah data resign
-
 			var Count_id int
 			var Employee models.Employee
 
@@ -140,17 +136,59 @@ func EmployeeAction(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if Count_resign == 0 {
-					_, err = dbhwi.Exec("INSERT INTO resigns (`number_of_employees`, `name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`,  `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", data.Number_of_employees, Employee.Name, JobDepartment(data.Number_of_employees)[0], JobDepartment(data.Number_of_employees)[1], Employee.Hire_date, helper.CekDateSubmission(data.Number_of_employees), data.Date_out, nil, helper.Periode_of_serve(Employee.Hire_date, data.Date_out), helper.TypeResign(data.Number_of_employees, data.Date_out)["type"], helper.Age(Employee.Date_of_birth), helper.TypeResign(data.Number_of_employees, data.Date_out)["status"], helper.DMYhms(), helper.DMYhms())
-					if err != nil {
-						fmt.Println(err.Error())
-						return
+					/*
+						_, err = dbhwi.Exec("INSERT INTO resigns (`number_of_employees`, `name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`,  `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+							data.Number_of_employees, Employee.Name, JobDepartment(data.Number_of_employees)[0], JobDepartment(data.Number_of_employees)[1], Employee.Hire_date, helper.CekDateSubmission(data.Number_of_employees), data.Date_out, nil, helper.Periode_of_serve(Employee.Hire_date, data.Date_out), helper.TypeResign(data.Number_of_employees, data.Date_out)["type"], helper.Age(Employee.Date_of_birth), helper.TypeResign(data.Number_of_employees, data.Date_out)["status"], helper.DMYhms(), helper.DMYhms())
+						if err != nil {
+							fmt.Println(err.Error())
+							return
+						}
+					*/
+					var data = map[string]interface{}{
+						"number_of_employees":    data.Number_of_employees,
+						"name":                   Employee.Name,
+						"position":               JobDepartment(data.Number_of_employees)[0],
+						"department":             JobDepartment(data.Number_of_employees)[1],
+						"hire_date":              Employee.Hire_date,
+						"classification":         helper.TypeResign(data.Number_of_employees, data.Date_out)["classification"],
+						"date_out":               data.Date_out,
+						"date_resignsubmissions": data.Date_out,
+						"periode_of_service":     helper.Periode_of_serve(Employee.Hire_date, data.Date_out),
+						"type":                   helper.TypeResign(data.Number_of_employees, data.Date_out)["type"],
+						"age":                    helper.Periode_of_serve(Employee.Hire_date, data.Date_out),
+						"status_resign":          helper.TypeResign(data.Number_of_employees, data.Date_out)["status"],
+						"printed":                0,
+						"created_at":             helper.DMYhms(),
+						"updated_at":             helper.DMYhms(),
 					}
+					repository.InsertResign("resigns", data)
 				} else if Count_resign > 0 {
-					_, err = dbhwi.Exec("UPDATE resigns SET number_of_employees = ? , name = ?, position = ?, department = ?, hire_date = ?, classification = ?, date_out = ?, date_resignsubmissions = ?, periode_of_service = ?, type = ?, age = ?, status_resign = ?, created_at = ?, updated_at = ? WHERE number_of_employees = ?", data.Number_of_employees, Employee.Name, JobDepartment(data.Number_of_employees)[0], JobDepartment(data.Number_of_employees)[1], Employee.Hire_date, helper.CekDateSubmission(data.Number_of_employees), data.Date_out, nil, helper.Periode_of_serve(Employee.Hire_date, data.Date_out), helper.TypeResign(data.Number_of_employees, data.Date_out)["type"], helper.Age(Employee.Date_of_birth), helper.TypeResign(data.Number_of_employees, data.Date_out)["status"], helper.DMYhms(), helper.DMYhms(), data.Number_of_employees)
-					if err != nil {
-						fmt.Println(err.Error())
-						return
+					/*
+						_, err = dbhwi.Exec("UPDATE resigns SET number_of_employees = ? , name = ?, position = ?, department = ?, hire_date = ?, classification = ?, date_out = ?, date_resignsubmissions = ?, periode_of_service = ?, type = ?, age = ?, status_resign = ?, created_at = ?, updated_at = ? WHERE number_of_employees = ?", data.Number_of_employees, Employee.Name, JobDepartment(data.Number_of_employees)[0], JobDepartment(data.Number_of_employees)[1], Employee.Hire_date, helper.CekDateSubmission(data.Number_of_employees), data.Date_out, nil, helper.Periode_of_serve(Employee.Hire_date, data.Date_out), helper.TypeResign(data.Number_of_employees, data.Date_out)["type"], helper.Age(Employee.Date_of_birth), helper.TypeResign(data.Number_of_employees, data.Date_out)["status"], helper.DMYhms(), helper.DMYhms(), data.Number_of_employees)
+						if err != nil {
+							fmt.Println(err.Error())
+							return
+						}
+					*/
+					var data1 = map[string]interface{}{
+						"number_of_employees":    data.Number_of_employees,
+						"name":                   Employee.Name,
+						"position":               JobDepartment(data.Number_of_employees)[0],
+						"department":             JobDepartment(data.Number_of_employees)[1],
+						"hire_date":              Employee.Hire_date,
+						"classification":         helper.TypeResign(data.Number_of_employees, data.Date_out)["classification"],
+						"date_out":               data.Date_out,
+						"date_resignsubmissions": data.Date_out,
+						"periode_of_service":     helper.Periode_of_serve(Employee.Hire_date, data.Date_out),
+						"type":                   helper.TypeResign(data.Number_of_employees, data.Date_out)["type"],
+						"age":                    helper.Periode_of_serve(Employee.Hire_date, data.Date_out),
+						"status_resign":          helper.TypeResign(data.Number_of_employees, data.Date_out)["status"],
+						"printed":                0,
+						"created_at":             helper.DMYhms(),
+						"updated_at":             helper.DMYhms(),
 					}
+					where := fmt.Sprintf("number_of_employees = '%s' ", data.Number_of_employees)
+					repository.UpdateResign("resigns", data1, where)
 				}
 				message = fmt.Sprintf("Data %s Berhasil di resign kan", data.Number_of_employees)
 				break
@@ -541,7 +579,6 @@ func GetGedungs(w http.ResponseWriter, r *http.Request) {
 
 }
 func JobDepartment(number_of_employees string) []string {
-
 	var db, err = models.ConnHrd()
 	defer db.Close()
 

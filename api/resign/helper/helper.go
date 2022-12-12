@@ -10,10 +10,9 @@ import (
 )
 
 const (
-	LINKFRONTEND string = "http://10.10.40.190:8080"
-
-	DDMMYYYYhhmmss = "2006-01-02 15:04:05"
-	DDMMYYYY       = "2006-01-02"
+	LINKFRONTEND   string = "http://10.10.40.190:8080"
+	DDMMYYYYhhmmss        = "2006-01-02 15:04:05"
+	DDMMYYYY              = "2006-01-02"
 )
 
 func Date(year, month, day int) time.Time {
@@ -38,6 +37,12 @@ func DMY() string {
 	}
 	datetimenow := t.In(location).Format(DDMMYYYY)
 	return datetimenow
+}
+
+func YearMysql(date string) string {
+	yearint, _ := strconv.Atoi(string(date[0:4]))
+	year := fmt.Sprintf("%d", yearint)
+	return year
 }
 
 func StringMonth() string {
@@ -93,11 +98,11 @@ func Rom(stringmonth string) string {
 	return Rom
 }
 
-func NomorLetter(No string, SK string, Rom string, DateString string) string {
+func NomorLetter(No int, SK string, Rom string, DateString string) string {
 	var s string
 	s = DateString
 	yearDate, _ := strconv.Atoi(string(s[0:4]))
-	output := fmt.Sprintf("%s%s%s/%d", No, SK, Rom, yearDate)
+	output := fmt.Sprintf("%d%s%s/%d", No, SK, Rom, yearDate)
 	return output
 }
 
@@ -140,8 +145,8 @@ func CekDateSubmission(Number_of_employees string) string {
 	defer dbresign.Close()
 
 	var Count_id int
-	var Submission models.Resignation_submission
 	var output string
+	var Submission models.Resignation_submission
 
 	err = dbresign.QueryRow("SELECT COUNT(id) as id, COALESCE(date_resignation_submissions, '0000-00-00') FROM resignation_submissions WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait'  ", Number_of_employees).
 		Scan(&Count_id, &Submission.Date_resignation_submissions)
@@ -158,9 +163,7 @@ func CekDateSubmission(Number_of_employees string) string {
 		dayDate, _ := strconv.Atoi(string(s[8:10]))
 
 		month := time.Month(monthDate)
-
 		theTime := time.Date(yearDate, month, dayDate, 0, 0, 0, 0, time.Local)
-
 		after := theTime.AddDate(0, 0, 14)
 
 		var stringafter string
@@ -179,7 +182,6 @@ func CekDateSubmission(Number_of_employees string) string {
 	default:
 		output = "Resign dahulu sebelum mengajukan resign"
 	}
-
 	return output
 }
 
@@ -192,19 +194,24 @@ func TypeResign(Number_of_employees string, Date_out string) map[string]interfac
 
 	var Count_id, Count_id_submission int
 	var Type string = "false"
-	var Status string = "wait"
+	var Status string = "resign"
 	var classification string = "Resign dahulu sebelum mengajukan resign"
 
-	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND status_resignsubmisssion = 'wait' ", Number_of_employees).
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND (status_resignsubmisssion = 'wait' OR status_resignsubmisssion = 'acc')", Number_of_employees).
 		Scan(&Count_id_submission)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+
+	date, _ := time.Parse("2006-01-02", Date_out)
+	datesubstract := date.AddDate(0, 0, -7)
+
 	if Count_id_submission > 0 {
 		classification = "Mengajukan resign tetapi resign sebelum waktunya"
+		Status = "wait"
 	}
 
-	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND date_resignation_submissions <= ?", Number_of_employees, Date_out).
+	err = dbhwi.QueryRow("SELECT COUNT(id) as id FROM resignation_submissions WHERE number_of_employees = ? AND date_resignation_submissions <= ?", Number_of_employees, datesubstract).
 		Scan(&Count_id)
 	if err != nil {
 		fmt.Println(err.Error())

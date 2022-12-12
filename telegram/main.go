@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI("5809763480:AAGeAnpqK__b6j5zonwK4GSYsE2C1LQPIWE")
+	bot, err := tgbotapi.NewBotAPI("5955228779:AAGCjIB_wU1oP2nuW9CiAPs3abnONsAaopY")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -17,13 +17,14 @@ func main() {
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+	u.Timeout = 1
 
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
 		if update.Message != nil { // If we got a message
-			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+			// log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+			log.Printf("Ini Pesan[%s]", update.Message.Text)
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 			msg.ReplyToMessageID = update.Message.MessageID

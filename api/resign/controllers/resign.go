@@ -65,8 +65,8 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
 	if checkNumber_of_employees != false {
 		justStringnumber_of_employees := strings.Join(number_of_employees, "")
-		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' ORDER BY id DESC", sqlPaging, justStringnumber_of_employees)
-		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ORDER BY resigns.id DESC", sqlPaging, justStringnumber_of_employees, justStringnumber_of_employees)
+		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ", sqlCount, justStringnumber_of_employees, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
 
@@ -86,7 +86,6 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-
 		w.Write([]byte(resp))
 		return
 	}
@@ -134,11 +133,9 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	var resign []models.Resign
-
 	for rows.Next() {
 		var each = models.Resign{}
 		var err = rows.Scan(&each.Id, &each.Number_of_employees, &each.Name, &each.Hire_date, &each.Classification, &each.Date_out, &each.Date_resignsubmissions, &each.Periode_of_service, &each.Position, &each.Department, &each.Type, &each.Age, &each.Status_resign, &each.Printed, &each.Created_at, &each.Updated_at)
-
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -181,10 +178,9 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetEditResign(w http.ResponseWriter, r *http.Request) {
-
 	w.Header().Set("Content-Type", "application/json")
-	vars := mux.Vars(r)
 
+	vars := mux.Vars(r)
 	Number_of_employess, _ := strconv.Atoi(vars["number_of_employees"])
 
 	var dbresign, err = models.ConnResign()
@@ -198,7 +194,6 @@ func GetEditResign(w http.ResponseWriter, r *http.Request) {
 
 	err = dbresign.QueryRow("SELECT number_of_employees, COALESCE(name, ''), COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(date_resignsubmissions, '0000-00-00'), COALESCE(type, ''), COALESCE(periode_of_service, 0), COALESCE(status_resign, ''), COALESCE(age, 0), COALESCE(classification, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00')  FROM resigns WHERE number_of_employees = ? ", Number_of_employess).
 		Scan(&Resign.Number_of_employees, &Resign.Name, &Resign.Position, &Resign.Department, &Resign.Hire_date, &Resign.Date_out, &Resign.Date_resignsubmissions, &Resign.Type, &Resign.Periode_of_service, &Resign.Status_resign, &Resign.Age, &Resign.Classification, &Resign.Created_at, &Resign.Updated_at)
-
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -207,7 +202,6 @@ func GetEditResign(w http.ResponseWriter, r *http.Request) {
 	result := map[string]interface{}{
 		"data": Resign,
 	}
-
 	resp, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -275,7 +269,6 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-
 	if err := r.ParseMultipartForm(1024); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -300,42 +293,90 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
+
+		var Count_idresigns = 0
+		Count_idresigns = repository.CountResign("resigns", fmt.Sprintf("number_of_employees = '%s' ", record[0]))
 		if Count_id > 0 {
 			switch Employee.Status_employee {
 			case "active":
-				_, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
-				if err != nil {
-					fmt.Println(err.Error())
+				// _, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
+				// if err != nil {
+				// 	fmt.Println(err.Error())
+				// }
+				var data = map[string]interface{}{
+					"date_out":        record[2],
+					"status_employee": "notactive",
+					"exit_statement":  record[3],
 				}
+				where := fmt.Sprintf("number_of_employees = '%s' ", record[0])
+				repository.UpdateHrd("employees", data, where)
+
+				if record[0] == "number_of_employees" {
+
+				} else if Count_idresigns < 1 && Count_id > 0 {
+					/*
+						_, err = dbresign.Exec("INSERT INTO `resigns`
+						(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)",
+						record[0], Employee.Name, JobDepartment(record[0])[0], JobDepartment(record[0])[1], Employee.Hire_date, helper.CekDateSubmission(record[0]), record[2], nil, helper.Periode_of_serve(Employee.Hire_date, record[2]), helper.TypeResign(record[0], record[2])["type"], helper.Age(Employee.Date_of_birth), "resign", 0, helper.DMYhms(), helper.DMYhms())
+						if err != nil {
+							fmt.Println(err.Error())
+							return
+						}
+					*/
+
+					var data = map[string]interface{}{
+						"number_of_employees":    record[0],
+						"name":                   Employee.Name,
+						"position":               JobDepartment(record[0])[0],
+						"department":             JobDepartment(record[0])[1],
+						"hire_date":              Employee.Hire_date,
+						"classification":         helper.TypeResign(record[0], record[2])["classification"],
+						"date_out":               record[2],
+						"date_resignsubmissions": nil,
+						"periode_of_service":     helper.Periode_of_serve(Employee.Hire_date, record[2]),
+						"type":                   helper.TypeResign(record[0], record[2])["type"],
+						"age":                    helper.Age(Employee.Date_of_birth),
+						"status_resign":          "resign",
+						"printed":                0,
+						"created_at":             helper.DMYhms(),
+						"updated_at":             helper.DMYhms(),
+					}
+					repository.InsertResign("resigns", data)
+				} else {
+					each := fmt.Sprintf("NIK %s Tidak dapat resign karena sudah resign </br>", record[0])
+					code = 404
+					notification = append(notification, each)
+				}
+
 			case "notactive":
-				queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", "0000-00-00", "active", record[3], record[0])
-				_, err = db.Exec(queryupdate)
-				if err != nil {
-					fmt.Println(err.Error())
+				// queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", "0000-00-00", "active", record[3], record[0])
+				// _, err = db.Exec(queryupdate)
+				// if err != nil {
+				// 	fmt.Println(err.Error())
+				// }
+
+				if record[2] == "" {
+					var data = map[string]interface{}{
+						"date_out":        nil,
+						"status_employee": "active",
+						"exit_statement":  record[3],
+					}
+					where := fmt.Sprintf("number_of_employees = '%s' ", record[0])
+					repository.UpdateHrd("employees", data, where)
+
+					repository.DeleteResign("work_experience_letters", where)
+					repository.DeleteResign("certificate_of_employments", where)
+					repository.DeleteResign("resigns", where)
+
+					each := fmt.Sprintf("NIK %s Diaktifkan kembali </br>", record[0])
+					code = 404
+					notification = append(notification, each)
 				}
 			default:
-				fmt.Println("Tidak Melakukan Transaksi update data karyawan")
+
 			}
 		}
 
-		var Count_idresigns = 0
-		err = dbresign.QueryRow("SELECT COUNT(id) as id FROM resigns WHERE number_of_employees = ? ", record[0]).
-			Scan(&Count_idresigns)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		if record[0] == "number_of_employees" {
-		} else if Count_idresigns < 1 && Count_id > 0 {
-			_, err = dbresign.Exec("INSERT INTO `resigns`(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)", record[0], Employee.Name, JobDepartment(record[0])[0], JobDepartment(record[0])[1], Employee.Hire_date, helper.CekDateSubmission(record[0]), record[2], nil, helper.Periode_of_serve(Employee.Hire_date, record[2]), helper.TypeResign(record[0], record[2])["type"], helper.Age(Employee.Date_of_birth), "resign", 0, helper.DMYhms(), helper.DMYhms())
-			if err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-		} else {
-			each := fmt.Sprintf("NIK %s Tidak dapat resign karena sudah resign </br>", record[0])
-			code = 404
-			notification = append(notification, each)
-		}
 	}
 	//untuk membuat json pertama kita harus set Header
 	w.Header().Set("Content-Type", "application/json")
@@ -438,7 +479,7 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 	fileSize := strconv.Itoa(len(fileContents))
 
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-disposition", "attachment;filename=Data_resign.xlsx")
+	w.Header().Set("Content-disposition", "attachment;filename=Data_Resign.xlsx")
 	w.Header().Set("Content-Length", fileSize)
 
 	t := bytes.NewReader(b.Bytes())
@@ -568,7 +609,6 @@ func ProcessAccResign(w http.ResponseWriter, r *http.Request) {
 
 		if len(payload.Data) == 0 {
 			message := fmt.Sprint(" Tidak Ada Karyawan yang di Acc")
-			fmt.Println(message)
 			resp, err := json.Marshal(message)
 			if err != nil {
 				fmt.Println(err.Error())

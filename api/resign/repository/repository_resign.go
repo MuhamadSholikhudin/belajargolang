@@ -4,6 +4,7 @@ import (
 	"belajargolang/api/resign/models"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 func InsertResign(table string, data map[string]interface{}) {
@@ -21,12 +22,14 @@ func InsertResign(table string, data map[string]interface{}) {
 		if reflect.TypeOf(val).Kind() == reflect.Int {
 			valmap = fmt.Sprintf("%s%d,", valmap, val)
 		} else {
-			valmap = fmt.Sprintf("%s'%s',", valmap, val)
+			str := fmt.Sprintf("%v", val)
+			var text = strings.Replace(str, "'", "`", -1)
+			valmap = fmt.Sprintf("%s '%s',", valmap, text)
 		}
 	}
 	keymap = keymap[:len(keymap)-1]
 	valmap = valmap[:len(valmap)-1]
-	query := fmt.Sprintf("INSERT %s (%s) VALUES (%s)", table, keymap, valmap)
+	query := fmt.Sprintf("INSERT %s (%s) VALUES (%s) ", table, keymap, valmap)
 	_, err = dbresign.Exec(query)
 	if err != nil {
 		fmt.Println(err.Error())

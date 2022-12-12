@@ -62,6 +62,7 @@ func main() {
 	r.HandleFunc("/api.v1/ExportLetter/{dataletter}", controllers.ExportLetter).Methods("GET")
 	r.HandleFunc("/api.v1/searchletter", controllers.SearchLetter).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
 	r.HandleFunc("/api.v1/processaccletter", controllers.ProcessAccLetter).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
+	r.HandleFunc("/api.v1/tryaccletter", controllers.PrintLetter).Methods("POST")
 
 	r.Use(mux.CORSMethodMiddleware(r))
 
