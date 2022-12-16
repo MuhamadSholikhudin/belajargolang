@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"belajargolang/api/resign/config"
 	"belajargolang/api/resign/helper"
 	"belajargolang/api/resign/models"
 	"belajargolang/api/resign/repository"
@@ -525,7 +526,7 @@ func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
 	}
 	q := u.Query()
 
-	var sqlPaging string = "SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_exprerience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters"
+	var sqlPaging string = "SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_experience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters"
 	var sqlCount string = "SELECT COUNT(*) FROM certificate_of_employments"
 	var params string = ""
 
@@ -536,6 +537,8 @@ func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
 		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
+	sqlPaging = fmt.Sprintf("%s ORDER BY id DESC", sqlPaging)
+
 	var total int64
 	db.QueryRow(sqlCount).Scan(&total)
 	if total == 0 {
@@ -784,8 +787,6 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := fmt.Sprintf("select resign_id, COALESCE(%s, '0000-00-00'), COALESCE(%s, 0), COALESCE(rom, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00') from %s", letter_Date, letter_No, table)
-
-	// rows, err := dbresign.Query("select resign_id, COALESCE(?, '0000-00-00'), COALESCE(?, 0), COALESCE(rom, ''), COALESCE(created_at, '0000-00-00 00:00:00'), COALESCE(updated_at, '0000-00-00 00:00:00') from ?", letter_Date, letter_No, dataletter)
 	rows, err := dbresign.Query(query)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -883,7 +884,7 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 
 func SearchLetter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Origin", config.Url_web)
 	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	if r.Method == "POST" {
@@ -896,7 +897,8 @@ func SearchLetter(w http.ResponseWriter, r *http.Request) {
 
 		decoder := json.NewDecoder(r.Body)
 		payload := struct {
-			Date             string `json:"date"`
+			Date_first       string `json:"date_first"`
+			Date_last        string `json:"date_last"`
 			Get_value_resign string `json:"get_value_resign"`
 			Selectcoloumn    string `json:"selectcoloumn"`
 		}{}
@@ -907,8 +909,8 @@ func SearchLetter(w http.ResponseWriter, r *http.Request) {
 		sqlsearch := fmt.Sprintf(`SELECT 
 		resigns.number_of_employees, resigns.name, %s.date_%s FROM %s JOIN resigns ON %s.resign_id = resigns.id 
 		WHERE 
-		%s.date_%s = '%s' `,
-			payload.Selectcoloumn, payload.Get_value_resign, payload.Selectcoloumn, payload.Selectcoloumn, payload.Selectcoloumn, payload.Get_value_resign, payload.Date)
+		%s.date_%s BETWEEN '%s' AND '%s'`,
+			payload.Selectcoloumn, payload.Get_value_resign, payload.Selectcoloumn, payload.Selectcoloumn, payload.Selectcoloumn, payload.Get_value_resign, payload.Date_first, payload.Date_last)
 
 		rows, err := dbresign.Query(sqlsearch)
 		if err != nil {
@@ -984,7 +986,7 @@ func SearchLetter(w http.ResponseWriter, r *http.Request) {
 }
 func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Origin", config.Url_web)
 	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	if r.Method == "POST" {
@@ -1005,7 +1007,7 @@ func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(payload.Data) == 0 {
-			message := fmt.Sprint(" Tidak Ada Karyawan yang di Acc")
+			message := fmt.Sprint("Tidak Ada Karyawan yang di Acc")
 			fmt.Println(message)
 			resp, err := json.Marshal(message)
 			if err != nil {
@@ -1039,7 +1041,6 @@ func ProcessAccLetter(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err.Error())
 		return
 	}
-
 	w.Write([]byte(resp))
 	return
 }
@@ -1089,11 +1090,11 @@ func DataLetter(number_of_employees string, table string, column string) map[str
 	_ = dbresign.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", number_of_employees).
 		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
 
-	var certifictaeofemploment = models.Letter{}
+	var letters = models.Letter{}
 	queryletter := fmt.Sprintf(`SELECT id, resign_id, number_of_employees, date_%s, no_%s, rom, created_at, updated_at FROM %s WHERE number_of_employees = '%s' `, column, column, table, number_of_employees)
+	fmt.Println(queryletter)
 	_ = dbresign.QueryRow(queryletter).
-		// _ = dbresign.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", number_of_employees).
-		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
+		Scan(&letters.Id, &letters.Resign_id, &letters.Number_of_employees, &letters.Date, &letters.No, &letters.Rom, &letters.Created_at, &letters.Updated_at)
 
 	dataletter := map[string]interface{}{
 		"number_of_employees": number_of_employees,
@@ -1102,48 +1103,11 @@ func DataLetter(number_of_employees string, table string, column string) map[str
 		"department":          ResignSel.Department,
 		"hire_date":           ResignSel.Hire_date,
 		"date_out":            ResignSel.Date_out,
-		"date":                certifictaeofemploment.Date,
-		"no":                  certifictaeofemploment.No,
-		"rom":                 certifictaeofemploment.Rom,
-		"created_at":          certifictaeofemploment.Created_at,
-		"updated_at":          certifictaeofemploment.Updated_at,
+		"date":                letters.Date,
+		"no":                  letters.No,
+		"rom":                 letters.Rom,
+		"created_at":          letters.Created_at,
+		"updated_at":          letters.Updated_at,
 	}
 	return dataletter
-}
-
-type M map[string]interface{}
-
-func doRequest(url, method string, data interface{}) (map[string]interface{}, error) {
-	var payload *bytes.Buffer = nil
-
-	if data != nil {
-		payload = new(bytes.Buffer)
-		err := json.NewEncoder(payload).Encode(data)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	request, err := http.NewRequest(method, url, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	client := new(http.Client)
-
-	response, err := client.Do(request)
-	if response != nil {
-		defer response.Body.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(response.Body)
-	responseBody := make(M)
-	err = json.NewDecoder(response.Body).Decode(&responseBody)
-	if err != nil {
-		return nil, err
-	}
-
-	return responseBody, nil
 }

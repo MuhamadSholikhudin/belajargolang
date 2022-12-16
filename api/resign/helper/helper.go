@@ -227,3 +227,18 @@ func TypeResign(Number_of_employees string, Date_out string) map[string]interfac
 	}
 	return output
 }
+
+func DateSubmissionCompareRequest(date_submission, date_request string) string {
+	datecreated := string(date_submission[0:10])
+	submission_date, _ := time.Parse("2006-01-02", datecreated)
+	d_submission := submission_date.AddDate(0, 0, 7)
+	request_date, _ := time.Parse("2006-01-02", date_request)
+	d1 := request_date.After(d_submission)
+	var d2 string
+	if d_submission.Equal(request_date) || d1 == true {
+		d2 = "true"
+	} else {
+		d2 = "false"
+	}
+	return d2
+}

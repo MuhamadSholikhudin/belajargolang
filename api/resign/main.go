@@ -1,6 +1,7 @@
 package main
 
 import (
+	"belajargolang/api/resign/config"
 	"belajargolang/api/resign/controllers"
 	"fmt"
 	"net/http"
@@ -66,6 +67,6 @@ func main() {
 
 	r.Use(mux.CORSMethodMiddleware(r))
 
-	fmt.Println("LIsten on Port 10.10.42.6:8880")
+	fmt.Println("LIsten on Port ", config.Url_web)
 	http.ListenAndServe(":8880", r)
 }

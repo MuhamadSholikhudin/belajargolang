@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"belajargolang/api/resign/config"
 	"belajargolang/api/resign/helper"
 	"belajargolang/api/resign/models"
 	"belajargolang/api/resign/repository"
@@ -65,10 +66,11 @@ func Resigns(w http.ResponseWriter, r *http.Request) {
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
 	if checkNumber_of_employees != false {
 		justStringnumber_of_employees := strings.Join(number_of_employees, "")
-		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ORDER BY resigns.id DESC", sqlPaging, justStringnumber_of_employees, justStringnumber_of_employees)
+		sqlPaging = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ", sqlPaging, justStringnumber_of_employees, justStringnumber_of_employees)
 		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%' OR name LIKE '%%%s%%' ", sqlCount, justStringnumber_of_employees, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
+	sqlPaging = fmt.Sprintf("%s ORDER BY id DESC", sqlPaging)
 
 	var total int64
 	db.QueryRow(sqlCount).Scan(&total)
@@ -299,10 +301,6 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 		if Count_id > 0 {
 			switch Employee.Status_employee {
 			case "active":
-				// _, err = db.Exec("UPDATE employees SET date_out = '?' , status_employee = '?', exit_statement = '?' WHERE number_of_employees = '?' ", record[2], "notactive", record[3], record[0])
-				// if err != nil {
-				// 	fmt.Println(err.Error())
-				// }
 				var data = map[string]interface{}{
 					"date_out":        record[2],
 					"status_employee": "notactive",
@@ -314,16 +312,6 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 				if record[0] == "number_of_employees" {
 
 				} else if Count_idresigns < 1 && Count_id > 0 {
-					/*
-						_, err = dbresign.Exec("INSERT INTO `resigns`
-						(	`number_of_employees`,`name`, `position`, `department`, `hire_date`, `classification`, `date_out`, `date_resignsubmissions`, `periode_of_service`, `type`, `age`, `status_resign`, `printed`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?,	?,	?,	?,	?,	?,	?,	?,	?,	?, ? , ?)",
-						record[0], Employee.Name, JobDepartment(record[0])[0], JobDepartment(record[0])[1], Employee.Hire_date, helper.CekDateSubmission(record[0]), record[2], nil, helper.Periode_of_serve(Employee.Hire_date, record[2]), helper.TypeResign(record[0], record[2])["type"], helper.Age(Employee.Date_of_birth), "resign", 0, helper.DMYhms(), helper.DMYhms())
-						if err != nil {
-							fmt.Println(err.Error())
-							return
-						}
-					*/
-
 					var data = map[string]interface{}{
 						"number_of_employees":    record[0],
 						"name":                   Employee.Name,
@@ -349,11 +337,6 @@ func UploadResigns(w http.ResponseWriter, r *http.Request) {
 				}
 
 			case "notactive":
-				// queryupdate := fmt.Sprintf("UPDATE employees SET date_out = '%s' , status_employee = '%s', exit_statement = '%s' WHERE number_of_employees = '%s' ", "0000-00-00", "active", record[3], record[0])
-				// _, err = db.Exec(queryupdate)
-				// if err != nil {
-				// 	fmt.Println(err.Error())
-				// }
 
 				if record[2] == "" {
 					var data = map[string]interface{}{
@@ -489,8 +472,9 @@ func ExportResign(w http.ResponseWriter, r *http.Request) {
 }
 
 func Searchresign(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Origin", config.Url_web)
 	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	if r.Method == "POST" {
@@ -503,14 +487,15 @@ func Searchresign(w http.ResponseWriter, r *http.Request) {
 
 		decoder := json.NewDecoder(r.Body)
 		payload := struct {
-			Date_out      string `json:"date_out"`
-			Selectcoloumn string `json:"selectcoloumn"`
+			Date_out_first string `json:"date_out_first"`
+			Date_out_last  string `json:"date_out_last"`
+			Selectcoloumn  string `json:"selectcoloumn"`
 		}{}
 		if err := decoder.Decode(&payload); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sqlsearch := fmt.Sprintf("SELECT number_of_employees, name, %s, status_resign FROM resigns WHERE %s LIKE '%%%s%%' AND status_resign = 'wait' ", payload.Selectcoloumn, payload.Selectcoloumn, payload.Date_out)
+		sqlsearch := fmt.Sprintf("SELECT number_of_employees, name, %s, status_resign FROM resigns WHERE %s BETWEEN '%s' AND '%s' AND status_resign = 'wait' ", payload.Selectcoloumn, payload.Selectcoloumn, payload.Date_out_first, payload.Date_out_last)
 		rows, err := dbresign.Query(sqlsearch)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -587,7 +572,7 @@ func Searchresign(w http.ResponseWriter, r *http.Request) {
 
 func ProcessAccResign(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "http://127.0.0.1:8000")
+	w.Header().Add("Access-Control-Allow-Origin", config.Url_web)
 	w.Header().Add("Access-Control-Allow-Headers", "*")
 
 	if r.Method == "POST" {
