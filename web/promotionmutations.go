@@ -6,6 +6,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/360EntSecGroup-Skylar/excelize"
 	_ "github.com/go-sql-driver/mysql"
@@ -32,7 +34,7 @@ type Mutations struct {
 }
 
 func connect() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrdit")
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrd")
 	if err != nil {
 		return nil, err
 	}
@@ -45,46 +47,92 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", http.StatusBadRequest)
 		return
 	}
-
 	if err := r.ParseMultipartForm(1024); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	uploadedFile, _, err := r.FormFile("file")
-
 	if err != nil {
 		log.Fatal("ERROR", err.Error())
 	}
-
 	xlsx, err := excelize.OpenReader(uploadedFile)
-
 	sheet1Name := "PromotionMutation"
 
-	for index, _ := range xlsx.GetRows(sheet1Name) {
-		fmt.Println(index)
-
+	for index := range xlsx.GetRows(sheet1Name) {
 		tambah := index + 1
+		// employee_id
+		//nocell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("A%d", tambah))
 
-		a := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("A%d", tambah))
-		b := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("B%d", tambah))
-		c := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("C%d", tambah))
-		d := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("D%d", tambah))
-		e := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("E%d", tambah))
-		f := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("F%d", tambah))
-		g := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("G%d", tambah))
-		h := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("H%d", tambah))
-		i := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("I%d", tambah))
-		j := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("J%d", tambah))
-		k := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("K%d", tambah))
-		l := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("L%d", tambah))
-		m := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("M%d", tambah))
-		// n := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("N%d", tambah))
+		// number_of_employees
+		number_of_employeescell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("B%d", tambah))
 
-		fmt.Println(a, b, c, d, e, f, g, h, i, j, k, l, m)
+		// name
+		namecell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("C%d", tambah))
 
+		// old_job_level
+		old_job_levelcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("D%d", tambah))
+
+		// new_Job_level
+		new_job_levelcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("E%d", tambah))
+
+		// start_date_job_level
+		start_date_job_levelcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("F%d", tambah))
+
+		// old_department
+		old_departmentcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("G%d", tambah))
+
+		// new_department
+		new_departmentcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("H%d", tambah))
+
+		//start_date_department
+		start_date_departmentcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("I%d", tambah))
+
+		//bagian
+		bagiancell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("J%d", tambah))
+
+		// cell
+		cellcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("K%d", tambah))
+
+		//remark
+		remarkcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("L%d", tambah))
+
+		var tve string
+		var vale, err = DateExcelToGo(start_date_job_levelcell)
+		tve = TimeToStringYYYYMMDD(vale)
+		if err != nil {
+			tve = "string"
+		}
+		// fmt.Println(a, b, c, d, tve, f, g, h, i, j, k, l, m)
+		fmt.Println(number_of_employeescell, namecell, old_job_levelcell, new_job_levelcell, tve, old_departmentcell, new_departmentcell, start_date_departmentcell, bagiancell, cellcell, remarkcell)
 	}
+}
 
+// func CheckEmp(number_of_empoyees string) int {
+
+// }
+
+func TimeToStringYYYYMMDD(t time.Time) string {
+	location, _ := time.LoadLocation("Asia/Bangkok")
+	t.In(location).Format("2006-01-02")
+	var tts string
+	tts = t.In(location).Format("2006-01-02")
+	return tts
+}
+
+func DateExcelToGo(DateString string) (time.Time, error) {
+	var err error
+	_, err = strconv.Atoi(DateString)
+	if err != nil {
+		return time.Now(), err
+	}
+	intUnix, err := strconv.ParseInt(DateString, 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var timego int64
+	timego = ((intUnix - 25569) * 86400)
+	myTime := time.Unix(timego, 0)
+	return myTime, nil
 }
 
 // ASLI

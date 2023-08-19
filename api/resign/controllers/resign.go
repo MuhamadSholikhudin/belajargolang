@@ -23,6 +23,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// mutex to protect the shared resource
+var mu sync.Mutex
+
+// wait group to wait for all goroutines to finish
+var wg sync.WaitGroup
+
 func Resigns(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -652,16 +658,16 @@ func AccResign(number_of_employees string, status_resign string) {
 	var yearstring string
 	yearstring = strconv.Itoa(time.Now().Year())
 
-	var CountCertificateByDate, CountNoCertificateEmployee int
-	err = dbresign.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_certificate_employee, 0) as no_certificate_employee FROM certificate_of_employments WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", yearstring, helper.StringMonth()).
-		Scan(&CountCertificateByDate, &CountNoCertificateEmployee)
+	var CountNoCertificateEmployee int
+	err = dbresign.QueryRow("SELECT COALESCE(no_certificate_employee, 0) FROM certificate_of_employments WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY no_certificate_employee DESC", yearstring, helper.StringMonth()).
+		Scan(&CountNoCertificateEmployee)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
 
-	var CountExperienceByDate, CountNoExperienceEmployee int
-	err = dbresign.QueryRow("SELECT COUNT(id) as CountExperienceByDate, COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_letter_exprerience) = ? AND MONTH(date_letter_exprerience) = ? ORDER BY date_letter_exprerience DESC", yearstring, helper.StringMonth()).
-		Scan(&CountExperienceByDate, &CountNoExperienceEmployee)
+	var CountNoExperienceEmployee int
+	err = dbresign.QueryRow("SELECT COALESCE(no_letter_experience, 0) FROM work_experience_letters WHERE YEAR(date_letter_experience) = ? AND MONTH(date_letter_experience) = ? ORDER BY no_letter_experience DESC", yearstring, helper.StringMonth()).
+		Scan(&CountNoExperienceEmployee)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
@@ -683,14 +689,119 @@ func AccResign(number_of_employees string, status_resign string) {
 		repository.InsertResign("certificate_of_employments", data)
 	} else if CountExperience == 0 {
 		var data = map[string]interface{}{
-			"resign_id":               Resign_id,
-			"number_of_employees":     number_of_employees,
-			"date_letter_exprerience": helper.DMY(),
-			"no_letter_experience":    (CountNoExperienceEmployee + 1),
-			"rom":                     helper.Rom(helper.StringMonth()),
-			"created_at":              helper.DMYhms(),
-			"updated_at":              helper.DMYhms(),
+			"resign_id":              Resign_id,
+			"number_of_employees":    number_of_employees,
+			"date_letter_experience": helper.DMY(),
+			"no_letter_experience":   (CountNoExperienceEmployee + 1),
+			"rom":                    helper.Rom(helper.StringMonth()),
+			"created_at":             helper.DMYhms(),
+			"updated_at":             helper.DMYhms(),
 		}
 		repository.InsertResign("work_experience_letters", data)
 	}
+}
+
+func Syncronresign(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Access-Control-Allow-Origin", config.Url_web)
+	w.Header().Add("Access-Control-Allow-Headers", "*")
+
+	UpdateResignFromDatamaster()
+
+	resp, err := json.Marshal("Data Resign Berhasil di sinkronisasi")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	w.Write([]byte(resp))
+	return
+}
+
+func UpdateResignFromDatamaster() {
+	mu.Lock()
+	db, err := models.ConnHrd()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+	var dbresign, _ = models.ConnResign()
+	defer dbresign.Close()
+	var count int
+	err = dbresign.QueryRow("SELECT COUNT(*) FROM resignation_submissions WHERE status_resignsubmisssion != 'cancel' ").
+		Scan(&count)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	switch count {
+	case 0:
+		break
+	default:
+		var id int
+		var number_of_employees string
+		rows, err := dbresign.Query("SELECT id, number_of_employees FROM resignation_submissions WHERE status_resignsubmisssion != 'cancel' ")
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			rows.Scan(&id, &number_of_employees)
+			wg.Add(1)
+			go Checkempnull(id, number_of_employees)
+		}
+		break
+	}
+	mu.Unlock()
+	wg.Done()
+}
+
+func Checkempnull(id int, number_of_employees string) {
+	mu.Lock()
+	db, err := models.ConnHrd()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+	var dbresign, _ = models.ConnResign()
+	defer dbresign.Close()
+	var date_out string
+	err = db.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ? ", number_of_employees).
+		Scan(&date_out)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	if date_out != "0000-00-00" {
+		wg.Add(1)
+		go ExecuteUpdate(id, number_of_employees, date_out)
+	}
+	mu.Unlock()
+	wg.Done()
+}
+
+func ExecuteUpdate(id int, number_of_employees string, date_out string) {
+	mu.Lock()
+	db, err := models.ConnHrd()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer db.Close()
+	var dbresign, _ = models.ConnResign()
+	defer dbresign.Close()
+	_, err = dbresign.Exec("UPDATE resignation_submissions SET date_out = ? WHERE id = ?", date_out, id)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	_, err = dbresign.Exec("UPDATE resigns SET date_out = ? WHERE number_of_employees = ? ", date_out, number_of_employees)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	mu.Unlock()
+	wg.Done()
 }

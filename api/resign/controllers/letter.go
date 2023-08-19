@@ -32,16 +32,23 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	db, err := models.ConnResign()
+	db, err := models.ConnHrd()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer db.Close()
 
+	dbresign, err := models.ConnResign()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbresign.Close()
+
 	var Resign_id int
 	var ResignSel = models.Resign{}
-	err = db.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
+	err = dbresign.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -51,23 +58,23 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	var data2 = map[string]interface{}{
 		"status_resign": "acc",
 	}
-	where := fmt.Sprintf("number_of_employees = %d ", Resign_id)
+	where := fmt.Sprintf("id = %d ", Resign_id)
 	repository.UpdateResign("resigns", data2, where)
 
 	var CountCertifcateNumberOf_employees int
 
-	err = db.QueryRow("SELECT COUNT(*) FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
+	err = dbresign.QueryRow("SELECT COUNT(*) FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&CountCertifcateNumberOf_employees)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
 
 	if CountCertifcateNumberOf_employees == 0 {
-		var CountCertificateByDate, CountNoCertificateEmployee int
+		var CountNoCertificateEmployee int
 		var yearstring string
 		yearstring = strconv.Itoa(time.Now().Year())
-		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_certificate_employee, 0) as no_certificate_employee FROM certificate_of_employments WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY date_certificate_employee DESC", yearstring, helper.StringMonth()).
-			Scan(&CountCertificateByDate, &CountNoCertificateEmployee)
+		err = dbresign.QueryRow("SELECT COALESCE(no_certificate_employee, 0) as no_certificate_employee FROM certificate_of_employments WHERE YEAR(date_certificate_employee) = ? AND MONTH(date_certificate_employee) = ? ORDER BY no_certificate_employee DESC", yearstring, helper.StringMonth()).
+			Scan(&CountNoCertificateEmployee)
 		if err != nil {
 			fmt.Print(err.Error())
 		}
@@ -84,18 +91,24 @@ func PostCertifcate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var certifictaeofemploment = models.Letter{}
-	err = db.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
+	err = dbresign.QueryRow("SELECT id, resign_id, number_of_employees, date_certificate_employee, no_certificate_employee, rom, created_at, updated_at FROM certificate_of_employments WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+	err = db.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ?", data.Number_of_employees).
+		Scan(&ResignSel.Date_out)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	certificate := map[string]interface{}{
 		"id":                  certifictaeofemploment.Id,
 		"resign_id":           certifictaeofemploment.Resign_id,
 		"number_of_employees": certifictaeofemploment.Number_of_employees,
 		"name":                ResignSel.Name,
 		"position":            ResignSel.Position,
-		"department":          ResignSel.Department,
+		"department":          helper.Deptout(ResignSel.Department),
 		"hire_date":           ResignSel.Hire_date,
 		"date_out":            ResignSel.Date_out,
 		"date":                certifictaeofemploment.Date,
@@ -127,16 +140,23 @@ func PostExperience(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	db, err := models.ConnResign()
+	db, err := models.ConnHrd()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer db.Close()
 
+	dbresign, err := models.ConnResign()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbresign.Close()
+
 	var Resign_id int
 	var ResignSel = models.Resign{}
-	err = db.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
+	err = dbresign.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", data.Number_of_employees).
 		Scan(&Resign_id, &ResignSel.Name, &ResignSel.Position, &ResignSel.Department, &ResignSel.Hire_date, &ResignSel.Date_out)
 	if err != nil {
 		fmt.Print(err.Error())
@@ -146,60 +166,63 @@ func PostExperience(w http.ResponseWriter, r *http.Request) {
 	var data2 = map[string]interface{}{
 		"status_resign": "acc",
 	}
-	where := fmt.Sprintf("number_of_employees = %d ", Resign_id)
+	where := fmt.Sprintf("id = %d ", Resign_id)
 	repository.UpdateResign("resigns", data2, where)
 
 	var CountExperienceNumberOf_employees int
-	err = db.QueryRow("SELECT COUNT(*) FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees).
+	err = dbresign.QueryRow("SELECT COUNT(*) FROM work_experience_letters WHERE number_of_employees = ?", data.Number_of_employees).
 		Scan(&CountExperienceNumberOf_employees)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
 
 	if CountExperienceNumberOf_employees == 0 {
-		var CountExperienceByDate, CountNoExperienceEmployee int
+		var CountNoExperienceEmployee int
 		var yearstring string
 		yearstring = strconv.Itoa(time.Now().Year())
-		err = db.QueryRow("SELECT COUNT(id) as CountCertificateByDate, COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_letter_exprerience) = ? AND MONTH(date_letter_exprerience) = ? ORDER BY date_letter_exprerience DESC", yearstring, helper.StringMonth()).
-			Scan(&CountExperienceByDate, &CountNoExperienceEmployee)
+		err = dbresign.QueryRow("SELECT COALESCE(no_letter_experience, 0) as no_letter_experience FROM work_experience_letters WHERE YEAR(date_letter_experience) = ? AND MONTH(date_letter_experience) = ? ORDER BY no_letter_experience DESC", yearstring, helper.StringMonth()).
+			Scan(&CountNoExperienceEmployee)
 		if err != nil {
 			fmt.Print(err.Error())
 		}
 		data := map[string]interface{}{
-			"resign_id":               Resign_id,
-			"number_of_employees":     data.Number_of_employees,
-			"date_letter_exprerience": helper.DMY(),
-			"no_letter_experience":    (CountNoExperienceEmployee + 1),
-			"rom":                     helper.Rom(helper.StringMonth()),
-			"created_at":              helper.DMYhms(),
-			"updated_at":              helper.DMYhms(),
+			"resign_id":              Resign_id,
+			"number_of_employees":    data.Number_of_employees,
+			"date_letter_experience": helper.DMY(),
+			"no_letter_experience":   (CountNoExperienceEmployee + 1),
+			"rom":                    helper.Rom(helper.StringMonth()),
+			"created_at":             helper.DMYhms(),
+			"updated_at":             helper.DMYhms(),
 		}
 		repository.InsertResign("work_experience_letters", data)
 	}
 
-	var certifictaeofemploment = models.Letter{}
-
-	err = db.QueryRow("SELECT id, resign_id, number_of_employees, date_letter_exprerience, no_letter_experience, rom, created_at, updated_at FROM work_experience_letters WHERE number_of_employees = ? ", data.Number_of_employees).
-		Scan(&certifictaeofemploment.Id, &certifictaeofemploment.Resign_id, &certifictaeofemploment.Number_of_employees, &certifictaeofemploment.Date, &certifictaeofemploment.No, &certifictaeofemploment.Rom, &certifictaeofemploment.Created_at, &certifictaeofemploment.Updated_at)
-
+	var workexperienceletter = models.Letter{}
+	err = dbresign.QueryRow("SELECT id, resign_id, number_of_employees, date_letter_experience, no_letter_experience, rom, created_at, updated_at FROM work_experience_letters WHERE number_of_employees = ? ", data.Number_of_employees).
+		Scan(&workexperienceletter.Id, &workexperienceletter.Resign_id, &workexperienceletter.Number_of_employees, &workexperienceletter.Date, &workexperienceletter.No, &workexperienceletter.Rom, &workexperienceletter.Created_at, &workexperienceletter.Updated_at)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = db.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ?", data.Number_of_employees).
+		Scan(&ResignSel.Date_out)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
 	certificate := map[string]interface{}{
-		"id":                  certifictaeofemploment.Id,
-		"resign_id":           certifictaeofemploment.Resign_id,
-		"number_of_employees": certifictaeofemploment.Number_of_employees,
+		"id":                  workexperienceletter.Id,
+		"resign_id":           workexperienceletter.Resign_id,
+		"number_of_employees": workexperienceletter.Number_of_employees,
 		"name":                ResignSel.Name,
 		"position":            ResignSel.Position,
-		"department":          ResignSel.Department,
+		"department":          helper.Deptout(ResignSel.Department),
 		"hire_date":           ResignSel.Hire_date,
 		"date_out":            ResignSel.Date_out,
-		"date":                certifictaeofemploment.Date,
-		"no":                  certifictaeofemploment.No,
-		"rom":                 certifictaeofemploment.Rom,
-		"created_at":          certifictaeofemploment.Created_at,
-		"updated_at":          certifictaeofemploment.Updated_at,
+		"date":                workexperienceletter.Date,
+		"no":                  workexperienceletter.No,
+		"rom":                 workexperienceletter.Rom,
+		"created_at":          workexperienceletter.Created_at,
+		"updated_at":          workexperienceletter.Updated_at,
 	}
 	result := map[string]interface{}{
 		"code":    200,
@@ -262,7 +285,7 @@ func GetParklaringCertificates(w http.ResponseWriter, r *http.Request) {
 		sqlCount = fmt.Sprintf("%s WHERE number_of_employees LIKE '%%%s%%'", sqlCount, justStringnumber_of_employees)
 		params = fmt.Sprintf("&%snumber_of_employees=%s", params, justStringnumber_of_employees)
 	}
-
+	sqlPaging = fmt.Sprintf("%s ORDER BY id DESC", sqlPaging)
 	var total int64
 	db.QueryRow(sqlCount).Scan(&total)
 	if total == 0 {
@@ -527,7 +550,7 @@ func GetParklaringExperiences(w http.ResponseWriter, r *http.Request) {
 	q := u.Query()
 
 	var sqlPaging string = "SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_experience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters"
-	var sqlCount string = "SELECT COUNT(*) FROM certificate_of_employments"
+	var sqlCount string = "SELECT COUNT(*) FROM work_experience_letters"
 	var params string = ""
 
 	number_of_employees, checkNumber_of_employees := q["number_of_employees"]
@@ -664,6 +687,9 @@ func GetEditParklaringExperience(w http.ResponseWriter, r *http.Request) {
 
 	Number_of_employess, _ := strconv.Atoi(vars["number_of_employees"])
 
+	var db, _ = models.ConnHrd()
+	defer db.Close()
+
 	var dbresign, err = models.ConnResign()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -672,8 +698,7 @@ func GetEditParklaringExperience(w http.ResponseWriter, r *http.Request) {
 	defer dbresign.Close()
 
 	var letter models.Letter
-
-	err = dbresign.QueryRow("SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_exprerience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters WHERE number_of_employees = ? ", Number_of_employess).
+	err = dbresign.QueryRow("SELECT id, COALESCE(resign_id, 0) , COALESCE(number_of_employees, ''), COALESCE(date_letter_experience, '0000-00-00'), COALESCE(no_letter_experience, 0), COALESCE(rom, ''), COALESCE(created_at, ''), COALESCE(updated_at, '') FROM work_experience_letters WHERE number_of_employees = ? ", Number_of_employess).
 		Scan(&letter.Id, &letter.Resign_id, &letter.Number_of_employees, &letter.Date, &letter.No, &letter.Rom, &letter.Created_at, &letter.Updated_at)
 
 	if err != nil {
@@ -682,10 +707,16 @@ func GetEditParklaringExperience(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resign models.Resign
-
 	err = dbresign.QueryRow("SELECT COALESCE(name, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00'), COALESCE(position, ''), COALESCE(department, '') FROM resigns WHERE id = ? ", letter.Resign_id).
 		Scan(&resign.Name, &resign.Hire_date, &resign.Date_out, &resign.Position, &resign.Department)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 
+	var Date_out string
+	err = db.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ?", Number_of_employess).
+		Scan(&Date_out)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -696,7 +727,7 @@ func GetEditParklaringExperience(w http.ResponseWriter, r *http.Request) {
 		"name":                resign.Name,
 		"number_of_employees": letter.Number_of_employees,
 		"hire_date":           resign.Hire_date,
-		"date_out":            resign.Date_out,
+		"date_out":            Date_out,
 		"position":            resign.Position,
 		"department":          resign.Department,
 		"date_letter":         letter.Date,
@@ -717,7 +748,6 @@ func GetEditParklaringExperience(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.Write([]byte(resp))
-
 }
 
 func GetUpdateParklaringExperience(w http.ResponseWriter, r *http.Request) {
@@ -735,7 +765,7 @@ func GetUpdateParklaringExperience(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dbresign.Close()
 
-	_, err = dbresign.Exec("UPDATE `work_experience_letters` SET `date_letter_exprerience`= ? ,`no_letter_experience`= ? ,`rom`=  ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Date, data.No, data.Rom, data.Created_at, data.Updated_at, data.Number_of_employees)
+	_, err = dbresign.Exec("UPDATE `work_experience_letters` SET `date_letter_experience`= ? ,`no_letter_experience`= ? ,`rom`=  ? ,`created_at`= ? ,`updated_at`= ?  WHERE number_of_employees = ? ", data.Date, data.No, data.Rom, data.Created_at, data.Updated_at, data.Number_of_employees)
 	if err != nil {
 		fmt.Println(err.Error())
 		result := map[string]interface{}{
@@ -763,6 +793,49 @@ func GetUpdateParklaringExperience(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(resp))
 }
 
+func DeleteLetter(w http.ResponseWriter, r *http.Request) {
+	// set header dengan type json
+	w.Header().Set("Content-type", "application/json")
+
+	// decode body jadi
+	decoder := json.NewDecoder(r.Body)
+	payload := struct {
+		Number_of_employees string `json:"number_of_employees"`
+		List                string `json:"list"`
+	}{}
+	if err := decoder.Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Pilih tabel yang akan di hapus
+	var table string
+	if payload.List == "certificate" {
+		table = "certificate_of_employments"
+	} else {
+		table = "work_experience_letters"
+	}
+
+	// Hapus Surat dari database
+	where := fmt.Sprintf("number_of_employees = '%s' ", payload.Number_of_employees)
+	repository.DeleteResign(table, where)
+
+	// Tampung data yang mau di tamplikan
+	result := map[string]interface{}{
+		"code":    200,
+		"data":    payload.Number_of_employees,
+		"message": "Delete Success",
+	}
+
+	// encode ke json berbentuk byte
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	// Respon json
+	w.Write([]byte(resp))
+}
+
 func ExportLetter(w http.ResponseWriter, r *http.Request) {
 	dbresign, err := models.ConnResign()
 	if err != nil {
@@ -782,7 +855,7 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 		letter_No = "no_certificate_employee"
 	} else {
 		table = "work_experience_letters"
-		letter_Date = "date_letter_exprerience"
+		letter_Date = "date_letter_experience"
 		letter_No = "no_letter_experience"
 	}
 
@@ -857,7 +930,6 @@ func ExportLetter(w http.ResponseWriter, r *http.Request) {
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("M%d", no), Resign.Age)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("N%d", no), Resign.Created_at)
 			xlsx.SetCellValue(sheet1Name, fmt.Sprintf("O%d", no), Resign.Updated_at)
-
 		}(&wg, no, letter.Resign_id, letter.Date, letter.No, letter.Rom, letter.Created_at, letter.Updated_at)
 	}
 
@@ -1085,6 +1157,9 @@ func DataLetter(number_of_employees string, table string, column string) map[str
 	dbresign, _ := models.ConnResign()
 	defer dbresign.Close()
 
+	db, _ := models.ConnHrd()
+	defer db.Close()
+
 	var Resign_id int
 	var ResignSel = models.Resign{}
 	_ = dbresign.QueryRow("SELECT id as resign_id, name, COALESCE(position, ''), COALESCE(department, ''), COALESCE(hire_date, '0000-00-00'), COALESCE(date_out, '0000-00-00') FROM resigns WHERE number_of_employees = ? ", number_of_employees).
@@ -1092,15 +1167,17 @@ func DataLetter(number_of_employees string, table string, column string) map[str
 
 	var letters = models.Letter{}
 	queryletter := fmt.Sprintf(`SELECT id, resign_id, number_of_employees, date_%s, no_%s, rom, created_at, updated_at FROM %s WHERE number_of_employees = '%s' `, column, column, table, number_of_employees)
-	fmt.Println(queryletter)
 	_ = dbresign.QueryRow(queryletter).
 		Scan(&letters.Id, &letters.Resign_id, &letters.Number_of_employees, &letters.Date, &letters.No, &letters.Rom, &letters.Created_at, &letters.Updated_at)
+
+	_ = db.QueryRow("SELECT COALESCE(date_out, '0000-00-00') FROM employees WHERE number_of_employees = ?", number_of_employees).
+		Scan(&letters.Date)
 
 	dataletter := map[string]interface{}{
 		"number_of_employees": number_of_employees,
 		"name":                ResignSel.Name,
 		"position":            ResignSel.Position,
-		"department":          ResignSel.Department,
+		"department":          helper.Deptout(ResignSel.Department),
 		"hire_date":           ResignSel.Hire_date,
 		"date_out":            ResignSel.Date_out,
 		"date":                letters.Date,

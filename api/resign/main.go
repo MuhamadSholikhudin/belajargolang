@@ -65,6 +65,11 @@ func main() {
 	r.HandleFunc("/api.v1/processaccletter", controllers.ProcessAccLetter).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
 	r.HandleFunc("/api.v1/tryaccletter", controllers.PrintLetter).Methods("POST")
 
+	r.HandleFunc("/api.v1/parklarings_delete", controllers.DeleteLetter).Methods("POST")
+
+	// Sinkronisasi
+	r.HandleFunc("/api.v1/syncronresign", controllers.Syncronresign).Methods(http.MethodPost, http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodOptions)
+
 	r.Use(mux.CORSMethodMiddleware(r))
 
 	fmt.Println("LIsten on Port ", config.Url_web)

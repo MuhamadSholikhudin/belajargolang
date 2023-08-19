@@ -48,12 +48,6 @@ func main() {
 		d := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("D%d", mulai))
 		e := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("E%d", mulai))
 
-		// "employee_id": "2",
-		// "bpjs_ketenagakerjaan": "15040913459",
-		// "date_bpjs_ketenagakerjaan": "0000-00-00",
-		// "bpjs_kesehatan": "0001814974986",
-		// "date_bpjs_kesehatan": "0000-00-00"
-
 		_, err = db.Exec("update employees set bpjs_ketenagakerjaan = ?, date_bpjs_ketenagakerjaan = ?, bpjs_kesehatan = ?, date_bpjs_kesehatan = ?  where id = ?", b, c, d, e, a)
 		if err != nil {
 			fmt.Println(err.Error())

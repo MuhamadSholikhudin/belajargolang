@@ -3,16 +3,14 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-/*
-const (
-	YYYYMMDD = "2006-01-02"
-)
-*/
+var mu sync.Mutex
+
+var wg sync.WaitGroup
 
 func connect() (*sql.DB, error) {
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrd")
@@ -32,25 +30,37 @@ func main() {
 	}
 	defer db.Close()
 
-	var startworks = []map[string]string{
-
-		map[string]string{"employee_id": "2", "job_id": "19", "startwork_date": "2016-04-01"},
-		map[string]string{"employee_id": "5", "job_id": "23", "startwork_date": "2016-04-01"},
-		map[string]string{"employee_id": "6", "job_id": "19", "startwork_date": "2016-04-01"},
+	rows, err := db.Query("SELECT employee_id FROM violations ")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
 	}
-	for _, startwork := range startworks {
-		fmt.Println(startwork["employee_id"], startwork["job_id"], startwork["startwork_date"])
-
-		intemployee_id, _ := strconv.Atoi(startwork["employee_id"])
-		intjob_id, _ := strconv.Atoi(startwork["job_id"])
-
-		_, err = db.Exec("update startworks set job_id = ?, startwork_date = ? where employee_id = ?", intjob_id, startwork["startwork_date"], intemployee_id)
+	defer rows.Close()
+	for rows.Next() {
+		var employee_id int
+		var err = rows.Scan(&employee_id)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-		fmt.Println("update success!")
-
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, employee_id int) {
+			mu.Lock()
+			var number_of_employees, name string
+			err = db.QueryRow("SELECT number_of_employees, name FROM employees WHERE id = ? ", employee_id).
+				Scan(&number_of_employees, &name)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			_, err := db.Exec("UPDATE violations SET number_of_employees = ?, name = ? WHERE employee_id = ?", number_of_employees, name, employee_id)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			mu.Unlock()
+			wg.Done()
+		}(&wg, employee_id)
+		wg.Wait()
 	}
-
 }

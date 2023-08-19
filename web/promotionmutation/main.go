@@ -48,11 +48,10 @@ const (
 )
 
 func Connect() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrdit")
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrd")
 	if err != nil {
 		return nil, err
 	}
-
 	return db, nil
 }
 
@@ -69,7 +68,6 @@ func Convertdateyyyymmdd(excel string) string {
 	if cekint == true { // jika dateexcel bertipe int
 
 		//var dateexcel int // buat variabel  dengan tipe data int
-
 		var start_date_job_levelconvint int
 
 		start_date_job_levelconvint, e := strconv.Atoi(dateexcel) // parse string ke int
@@ -161,10 +159,6 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 	sheet1Name := "PromotionMutation"
 
 	var db, _ = Connect()
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// 	return
-	// }
 	defer db.Close()
 
 	for index, _ := range xlsx.GetRows(sheet1Name) {
@@ -210,194 +204,182 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 		//remark
 		remarkcell := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("M%d", tambah))
 
-		//cek startdatejob
-		if start_date_job_levelcell == "" { //jika startdatejob kosong
-			// start_date_job_levelcell = "Kosong"
-		} else { //jika startdatejo ada maka cek format tanggal
+		if start_date_job_levelcell != "" && Convertdateyyyymmdd(start_date_job_levelcell) != "isstring" { //jika startdatejo ada maka cek format tanggal
 
-			if Convertdateyyyymmdd(start_date_job_levelcell) == "isstring" { // jika start_date_job_levelcell bertipe string
-				//fmt.Println("Ini adalah string", Convertdateyyyymmdd(start_date_job_levelcell))
-				http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena format tanggal salah !", http.StatusFound)
+			//membuar variabel penampung data dengan struct
+			var count = Count{}
 
-			} else { // jika start_date_job_levelcell bertipe int dan bisa di convert ke time
+			// execution query
+			//menampilkan data employee
+			err = db.
+				QueryRow("select count(id) as countid from employees where number_of_employees = ?", number_of_employeescell).
+				Scan(&count.countid)
 
-				//membuar variabel penampung data dengan struct
-				var count = Count{}
+			if count.countid > 0 { // jika jumlah nik ada karena lebih dari 0
+				var jobemp = Jobs{}
+				var jobold = Jobs{}
+				var joboldsel = Jobs{}
+				var jobnewsel = Jobs{}
+				var jobnew = Jobs{}
 
-				// execution query
-				//menampilkan data employee
+				var employee = Employees{}
+
 				err = db.
-					QueryRow("select count(id) as countid from employees where number_of_employees = ?", number_of_employeescell).
-					Scan(&count.countid)
+					QueryRow("select id from employees where number_of_employees = ?", number_of_employeescell).
+					Scan(&employee.id)
 
-				if count.countid > 0 { // jika jumlah nik ada karena lebih dari 0
-					var jobemp = Jobs{}
-					var jobold = Jobs{}
-					var joboldsel = Jobs{}
-					var jobnewsel = Jobs{}
-					var jobnew = Jobs{}
+				if old_job_levelcell == "" { // jika old_job_levelcell kosong maka tampilkan job level sekarang berdasarkan tabel jobs
 
-					var employee = Employees{}
+					//fmt.Printf("old_job_levelcell Kosong")
 
+					//menampilkan data job_id berdasarkan karyawan sekarang
 					err = db.
-						QueryRow("select id from employees where number_of_employees = ?", number_of_employeescell).
-						Scan(&employee.id)
+						QueryRow("select job_id as id from employees where number_of_employees = ?", number_of_employeescell).
+						Scan(&jobemp.id)
 
-					if old_job_levelcell == "" { // jika old_job_levelcell kosong maka tampilkan job level sekarang berdasarkan tabel jobs
+					//menampilkan data old_job_level
+					err = db.
+						QueryRow("select id, level from jobs where id = ?", jobemp.id).
+						Scan(&jobold.id, &jobold.level)
 
-						//fmt.Printf("old_job_levelcell Kosong")
+					//menampilkan data new_job_level
+					err = db.
+						QueryRow("select count(id) as id from jobs  where job_level = ?", new_job_levelcell).
+						Scan(&jobnewsel.id)
 
-						//menampilkan data job_id berdasarkan karyawan sekarang
+					if jobnewsel.id > 0 { // job level baru ada maka exexute promosi demosi
 						err = db.
-							QueryRow("select job_id as id from employees where number_of_employees = ?", number_of_employeescell).
-							Scan(&jobemp.id)
+							QueryRow("select id, level from jobs where job_level = ?", new_job_levelcell).
+							Scan(&jobnew.id, &jobnew.level)
 
-						//menampilkan data old_job_level
-						err = db.
-							QueryRow("select id, level from jobs where id = ?", jobemp.id).
-							Scan(&jobold.id, &jobold.level)
+						if jobnew.level < jobold.level { // Jika new_job_level lebih besar dari old_job_level maka promosi
 
-						//menampilkan data new_job_level
-						err = db.
-							QueryRow("select count(id) as id from jobs  where job_level = ?", new_job_levelcell).
-							Scan(&jobnewsel.id)
-
-						if jobnewsel.id > 0 { // job level baru ada maka exexute promosi demosi
-							err = db.
-								QueryRow("select id, level from jobs where job_level = ?", new_job_levelcell).
-								Scan(&jobnew.id, &jobnew.level)
-
-							if jobnew.level < jobold.level { // Jika new_job_level lebih besar dari old_job_level maka promosi
-
-								// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell)
-								_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell, timestampnow(), timestampnow())
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-
-								//fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
-								_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-								fmt.Println("promotion success!")
-
-								//fmt.Println("insert into promosimutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell)
-
-							} else if jobnew.level > jobold.level { // Jika new_job_level lebih kecil dari old_job_level maka demosi
-
-								// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell)
-								_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell, timestampnow(), timestampnow())
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-
-								// fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
-								_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-								fmt.Println("demotion success!")
-
-							} else if jobnew.level == jobold.level { // Jika new_job_level sama dengan old_job_level tidak ada action
-								// fmt.Println("Old Job Level EQUAL New Job Level")
-								http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena job levelnya sama !", http.StatusFound)
-
-							} else { // Jika tidak terjadi maka kembali ke rule default
-								// fmt.Println("Not execute")
-								http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena data error !", http.StatusFound)
+							// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell)
+							_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell, timestampnow(), timestampnow())
+							if err != nil {
+								fmt.Println(err.Error())
+								return
 							}
 
-						} else {
-							http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena new_job_level tidak ada pada database !", http.StatusFound)
-						}
+							//fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
+							_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
+							if err != nil {
+								fmt.Println(err.Error())
+								return
+							}
+							fmt.Println("promotion success!")
 
-					} else { // jika old_job_levelcell tidak kosong maka tampilkan berdasarkan tabel jobs
+							//fmt.Println("insert into promosimutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell)
 
-						//fmt.Printf("old_job_levelcell Ada")
+						} else if jobnew.level > jobold.level { // Jika new_job_level lebih kecil dari old_job_level maka demosi
 
-						//mencari job_level lama
-						err = db.
-							QueryRow("select count(id) as id from jobs where job_level = ?", old_job_levelcell).
-							Scan(&joboldsel.id)
-
-						//menampilkan data new_job_level
-						err = db.
-							QueryRow("select count(id) as id from jobs where job_level = ?", new_job_levelcell).
-							Scan(&jobnewsel.id)
-
-						if jobnewsel.id > 0 && joboldsel.id > 0 { // job level baru ada maka
-
-							//fmt.Printf("new_job_levelcell Ada")
-
-							//menampikan data old job level
-							err = db.
-								QueryRow("select id, level from jobs where job_level = ?", old_job_levelcell).
-								Scan(&jobold.id, &jobold.level)
-
-							err = db.
-								QueryRow("select id, level from jobs where job_level = ?", new_job_levelcell).
-								Scan(&jobnew.id, &jobnew.level)
-
-							if jobnew.level < jobold.level { // Jika new_job_level lebih besar dari old_job_level maka promosi
-
-								// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell)
-								_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell, timestampnow(), timestampnow())
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-
-								// fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
-								_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-								fmt.Println("promotion success!")
-
-							} else if jobnew.level > jobold.level { // Jika new_job_level lebih kecil dari old_job_level maka demosi
-
-								// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell)
-								_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell, timestampnow(), timestampnow())
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-
-								// fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
-								_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
-								if err != nil {
-									fmt.Println(err.Error())
-									return
-								}
-								fmt.Println("demotion success!")
-
-							} else if jobnew.level == jobold.level { // Jika new_job_level sama dengan old_job_level tidak ada action
-								// fmt.Printf("Sama")
-								http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena job levelnya sama !", http.StatusFound)
-
-							} else { // Jika tidak terjadi maka kembali ke rule default
-								// fmt.Printf("Else ")
-								http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena data error !", http.StatusFound)
-
+							// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell)
+							_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell, timestampnow(), timestampnow())
+							if err != nil {
+								fmt.Println(err.Error())
+								return
 							}
 
-						} else { // job level baru tidak ada maka
+							// fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
+							_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
+							if err != nil {
+								fmt.Println(err.Error())
+								return
+							}
+							fmt.Println("demotion success!")
+
+						} else if jobnew.level == jobold.level { // Jika new_job_level sama dengan old_job_level tidak ada action
+							// fmt.Println("Old Job Level EQUAL New Job Level")
+							http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena job levelnya sama !", http.StatusFound)
+
+						} else { // Jika tidak terjadi maka kembali ke rule default
+							// fmt.Println("Not execute")
 							http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena data error !", http.StatusFound)
 						}
 
+					} else {
+						http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena new_job_level tidak ada pada database !", http.StatusFound)
 					}
 
-				} else {
-					http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena nik tidak di temukan !", http.StatusFound)
+				} else { // jika old_job_levelcell tidak kosong maka tampilkan berdasarkan tabel jobs
+
+					//mencari job_level lama
+					err = db.
+						QueryRow("select count(id) as id from jobs where job_level = ?", old_job_levelcell).
+						Scan(&joboldsel.id)
+
+					//menampilkan data new_job_level
+					err = db.
+						QueryRow("select count(id) as id from jobs where job_level = ?", new_job_levelcell).
+						Scan(&jobnewsel.id)
+
+					if jobnewsel.id > 0 && joboldsel.id > 0 { // job level baru ada maka
+
+						//fmt.Printf("new_job_levelcell Ada")
+
+						//menampikan data old job level
+						err = db.
+							QueryRow("select id, level from jobs where job_level = ?", old_job_levelcell).
+							Scan(&jobold.id, &jobold.level)
+
+						err = db.
+							QueryRow("select id, level from jobs where job_level = ?", new_job_levelcell).
+							Scan(&jobnew.id, &jobnew.level)
+
+						if jobnew.level < jobold.level { // Jika new_job_level lebih besar dari old_job_level maka promosi
+
+							// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell)
+							_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "promotion", remarkcell, timestampnow(), timestampnow())
+							if err != nil {
+								fmt.Println(err.Error())
+								return
+							}
+
+							// fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
+							_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
+							if err != nil {
+								fmt.Println(err.Error())
+								return
+							}
+							fmt.Println("promotion success!")
+
+						} else if jobnew.level > jobold.level { // Jika new_job_level lebih kecil dari old_job_level maka demosi
+
+							// fmt.Printf("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, action, remark) values (%d,'%s',%d,%d,'%s', '%s')", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell)
+							_, err = db.Exec("insert into promotionmutations (employee_id, start_date_job_level, old_job_level, new_job_level, activity, remark, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)", employee.id, Convertdateyyyymmdd(start_date_job_levelcell), jobold.id, jobnew.id, "demotion", remarkcell, timestampnow(), timestampnow())
+							if err != nil {
+								fmt.Println(err.Error())
+								return
+							}
+
+							// fmt.Printf("update employees set job_id = %d where id = %d ", jobnew.id, employee.id)
+							_, err = db.Exec("update employees set job_id = ? where id = ? ", jobnew.id, employee.id)
+							if err != nil {
+								fmt.Println(err.Error())
+								return
+							}
+							fmt.Println("demotion success!")
+
+						} else if jobnew.level == jobold.level { // Jika new_job_level sama dengan old_job_level tidak ada action
+							// fmt.Printf("Sama")
+							http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena job levelnya sama !", http.StatusFound)
+
+						} else { // Jika tidak terjadi maka kembali ke rule default
+							// fmt.Printf("Else ")
+							http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena data error !", http.StatusFound)
+
+						}
+
+					} else { // job level baru tidak ada maka
+						http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena data error !", http.StatusFound)
+					}
+
 				}
 
+			} else {
+				http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi atau demosi "+number_of_employeescell+" tidak dapat di execute karena nik tidak di temukan !", http.StatusFound)
 			}
+
 		}
 
 		// start_date_departmentcell
@@ -493,15 +475,12 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 									fmt.Println(err.Error())
 									return
 								}
-
 								_, err = db.Exec("update employees set department_id = ? where id = ? ", deptnew.id, employeedept.id)
 								if err != nil {
 									fmt.Println(err.Error())
 									return
 								}
-
 								fmt.Println("Mutation Department Not NULL Success Insert in Database")
-
 							}
 
 						} else {
@@ -519,12 +498,7 @@ func routeSubmitImportExcel(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		// fmt.Println(nocell, number_of_employeescell, namecell, old_job_levelcell, new_job_levelcell, start_date_job_levelcell, activitycell, old_departmentcell, new_departmentcell, start_date_departmentcell, bagiancell, cellcell, remarkcell)
 	}
-
-	// http.Redirect(w, r, "http://10.10.40.190:1001/dashboards", http.StatusFound)
-	// http.Redirect(w, r, "http://127.0.0.1:8000/notifications/promotionmutation/Data Promosi, Demosi dan Mutasi berhasil di execute semua.", http.StatusFound)
-
 }
 
 // ASLI

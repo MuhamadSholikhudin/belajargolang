@@ -1,0 +1,18 @@
+
+<!DOCTYPE html>
+<html>
+    <head> 
+        <title>Input Message Excel</title>
+    </head>
+    <body>
+        <form method="POST" action="/importexcelprocess" enctype="multipart/form-data">
+            <label>The Excel :</label>
+            <input type="file" name="file" required /><br />
+
+            <label>Rename to :</label>
+            <input type="text" name="alias" /><br />
+
+            <button type="submmit">Submit</button>
+        </form>
+    </body>
+</html>
