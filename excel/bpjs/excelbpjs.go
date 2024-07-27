@@ -10,7 +10,7 @@ import (
 )
 
 func Vonnect() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrdit")
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/hrd")
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func main() {
 		d := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("D%d", mulai))
 		e := xlsx.GetCellValue(sheet1Name, fmt.Sprintf("E%d", mulai))
 
-		_, err = db.Exec("update employees set bpjs_ketenagakerjaan = ?, date_bpjs_ketenagakerjaan = ?, bpjs_kesehatan = ?, date_bpjs_kesehatan = ?  where id = ?", b, c, d, e, a)
+		_, err = db.Exec("update employees set bpjs_ketenagakerjaan = ?, date_bpjs_ketenagakerjaan = ?, bpjs_kesehatan = ?, date_bpjs_kesehatan = ?  where number_of_employees = ?", b, c, d, e, a)
 		if err != nil {
 			fmt.Println(err.Error())
 			return

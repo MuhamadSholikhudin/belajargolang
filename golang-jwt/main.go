@@ -132,10 +132,8 @@ func authenticateUser(username, password string) (bool, M) {
 		resM := res.(M)
 		delete(resM, "password")
 		fmt.Println("ini resM =>", resM)
-
 		return true, resM
 	}
-
 	return false, nil
 }
 

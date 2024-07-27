@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/360EntSecGroup-Skylar/excelize"
+	// "github.com/360EntSecGroup-Skylar/excelize"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/xuri/excelize/v2"
 )
 
 type M map[string]interface{}
@@ -29,7 +30,8 @@ func main() {
 	// res = sqlQuery()
 	// exportExcel(res)
 
-	excelWrite()
+	// excelWrite()
+	ReadRows()
 
 }
 
@@ -122,13 +124,9 @@ func connect() (*sql.DB, error) {
 //         xlsx.SetCellValue(sheet1Name, fmt.Sprintf("B%d", i+1), each.name)
 
 //     }
-
 //     err = xlsx.SaveAs("./file2.xlsx")
-
 //     if err != nil {
-
 //         fmt.Println(err)
-
 //     }
 
 // }
@@ -162,23 +160,55 @@ func createExcel() {
 
 }
 
-func excelWrite() {
-	xlsx, err := excelize.OpenFile("./file1.xlsx")
+// func excelWrite() {
+// 	xlsx, err := excelize.OpenFile("./file1.xlsx")
+// 	if err != nil {
+// 		log.Fatal("ERROR", err.Error())
+// 	}
+
+// 	sheet1Name := "Sheet One"
+
+// 	rows := make([]M, 0)
+// 	for i := 2; i < 5; i++ {
+// 		row := M{
+// 			"Name":   xlsx.GetCellValue(sheet1Name, fmt.Sprintf("A%d", i)),
+// 			"Gender": xlsx.GetCellValue(sheet1Name, fmt.Sprintf("B%d", i)),
+// 			"Age":    xlsx.GetCellValue(sheet1Name, fmt.Sprintf("C%d", i)),
+// 		}
+// 		rows = append(rows, row)
+// 	}
+
+// 	fmt.Printf("%v \n", rows)
+// }
+
+func ReadRows() {
+	f, err := excelize.OpenFile("sample.xlsx")
 	if err != nil {
-		log.Fatal("ERROR", err.Error())
+		fmt.Println(err)
+		return
 	}
-
-	sheet1Name := "Sheet One"
-
-	rows := make([]M, 0)
-	for i := 2; i < 5; i++ {
-		row := M{
-			"Name":   xlsx.GetCellValue(sheet1Name, fmt.Sprintf("A%d", i)),
-			"Gender": xlsx.GetCellValue(sheet1Name, fmt.Sprintf("B%d", i)),
-			"Age":    xlsx.GetCellValue(sheet1Name, fmt.Sprintf("C%d", i)),
+	defer func() {
+		// Close the spreadsheet.
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
 		}
-		rows = append(rows, row)
+	}()
+	rows, err := f.Rows("Sheet One")
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
-
-	fmt.Printf("%v \n", rows)
+	for rows.Next() {
+		row, err := rows.Columns()
+		if err != nil {
+			fmt.Println(err)
+		}
+		for _, colCell := range row {
+			fmt.Print(colCell, "\t")
+		}
+		fmt.Println()
+	}
+	if err = rows.Close(); err != nil {
+		fmt.Println(err)
+	}
 }

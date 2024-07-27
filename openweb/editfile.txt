@@ -1,0 +1,44 @@
+package main
+
+import (
+	"log"
+	"fmt"
+	"os"
+)
+
+func Modify() {
+	// OpenFile with Read Write Mode
+	file, err := os.OpenFile("test.txt", os.O_RDWR, 0644)
+	
+	if err != nil {
+		log.Fatalf("open file failed: %s", err)
+	}
+	defer file.Close()
+	
+	lenUpdate, err := file.WriteAt([]byte("These"), 0) // Write at 0 beginning
+	if err != nil {
+		log.Fatalf("write to file failed: %s", err)
+	}
+	fmt.Printf("Length update: %d bytes\n", lenUpdate)
+	fmt.Printf("File Name: %s\n", file.Name())
+}
+
+func ReadFile() {
+	data, err := os.ReadFile("test.txt")
+	if err != nil {
+		log.Panicf("read data from file failed: %s", err)
+	}
+
+	fmt.Printf("File Content: %s\n", string(data[:]))	
+}
+
+func main() {
+	fmt.Println("Read file before modify")
+	ReadFile()
+	
+	fmt.Println("Using WriteAt function")
+	Modify()
+	
+	fmt.Println("Read file after modify")
+	ReadFile()
+}
